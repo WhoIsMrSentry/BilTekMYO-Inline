@@ -8,7 +8,7 @@ import { useEscape } from './ui';
 import { api, apiUrl, errorMessage, formatBytes, formatDateTime, formatDays, jsonInit, localDateTimeValue, maxUploadBytes, typeMeta, weekdays } from './domain';
 import type { Content, ContentType, Display } from './domain';
 
-const editorTypes: ContentType[] = ['announcement', 'school-info', 'image', 'video', 'emergency'];
+const editorTypes: ContentType[] = ['announcement', 'school-info', 'image', 'video', 'camera-stream', 'emergency'];
 const durationPresets = [8, 12, 20, 30];
 const uploadAccept = '.pptx,.docx,.pdf,.png,.jpg,.jpeg,.webp,.mp4,application/pdf,image/png,image/jpeg,image/webp,video/mp4,application/vnd.openxmlformats-officedocument.presentationml.presentation,application/vnd.openxmlformats-officedocument.wordprocessingml.document';
 const hour = 3_600_000;
@@ -36,6 +36,8 @@ type ContentEditorProps = {
   onSaved: (message: string) => Promise<void> | void;
 };
 
+type ActivationMode = 'rotation' | 'interval' | 'motion';
+
 export function ContentEditor({ item, displays, onClose, onSaved }: ContentEditorProps) {
   const [title, setTitle] = useState(item?.title ?? '');
   const [kind, setKind] = useState<ContentType>(item?.type ?? 'announcement');
@@ -46,6 +48,9 @@ export function ContentEditor({ item, displays, onClose, onSaved }: ContentEdito
   const [endsAt, setEndsAt] = useState(() => localDateTimeValue(item ? new Date(item.schedule.endsAt) : new Date(Date.now() + hour)));
   const [targetDisplays, setTargetDisplays] = useState<string[]>(item?.schedule.displayIds ?? (displays[0] ? [displays[0].id] : []));
   const [daysOfWeek, setDaysOfWeek] = useState<number[]>(item?.schedule.daysOfWeek ?? []);
+  const [activationMode, setActivationMode] = useState<ActivationMode>((item?.payload.activationMode as ActivationMode) ?? 'rotation');
+  const [intervalMinutes, setIntervalMinutes] = useState(Number(item?.payload.intervalSeconds ?? 300) / 60);
+  const [motionCooldownSeconds, setMotionCooldownSeconds] = useState(Number(item?.payload.motionCooldownSeconds ?? 15));
   const [attachment, setAttachment] = useState<File>();
   const [attachmentUrl, setAttachmentUrl] = useState(item?.payload.attachmentUrl ?? '');
   const [attachmentName, setAttachmentName] = useState(item?.payload.attachmentName ?? '');
@@ -54,8 +59,9 @@ export function ContentEditor({ item, displays, onClose, onSaved }: ContentEdito
   const [error, setError] = useState('');
   const [dirty, setDirty] = useState(false);
 
-  useEffect(() => { setDirty(true); }, [title, kind, text, streamUrl, duration, startsAt, endsAt, targetDisplays, daysOfWeek, attachment, attachmentUrl]);
+  useEffect(() => { setDirty(true); }, [title, kind, text, streamUrl, duration, startsAt, endsAt, targetDisplays, daysOfWeek, activationMode, intervalMinutes, motionCooldownSeconds, attachment, attachmentUrl]);
   useEffect(() => { setDirty(false); }, []);
+  useEffect(() => { if (kind === 'camera-stream' && activationMode === 'rotation') setActivationMode('motion'); }, [kind, activationMode]);
 
   const localPreview = useMemo(() => attachment?.type.startsWith('image/') ? URL.createObjectURL(attachment) : '', [attachment]);
   useEffect(() => () => { if (localPreview) URL.revokeObjectURL(localPreview); }, [localPreview]);
@@ -86,6 +92,8 @@ export function ContentEditor({ item, displays, onClose, onSaved }: ContentEdito
       if (!targetDisplays.length) throw new Error('En az bir ekran seçmelisiniz.');
       const start = new Date(startsAt); const end = new Date(endsAt);
       if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end <= start) throw new Error('Bitiş zamanı başlangıçtan sonra olmalı.');
+      if (activationMode === 'interval' && (!Number.isFinite(intervalMinutes) || intervalMinutes < 1 || intervalMinutes > 1440 || intervalMinutes * 60 < duration)) throw new Error('Tekrar aralığı 1–1.440 dakika olmalı ve gösterim süresinden uzun olmalı.');
+      if (activationMode === 'motion' && (!Number.isFinite(motionCooldownSeconds) || motionCooldownSeconds < 5 || motionCooldownSeconds > 300)) throw new Error('Hareket sonrası etkinlik 5–300 saniye arasında olmalı.');
       let normalizedStreamUrl = '';
       if (streamUrl.trim()) {
         let parsedStreamUrl: URL;
@@ -108,8 +116,14 @@ export function ContentEditor({ item, displays, onClose, onSaved }: ContentEdito
       }
       const content: Content = {
         id: item?.id ?? `content-${crypto.randomUUID()}`, type: kind, title: title.trim(),
-        payload: { ...(text.trim() ? { text: text.trim() } : {}), ...(normalizedStreamUrl ? { videoUrl: normalizedStreamUrl } : {}), ...(uploadedUrl ? { attachmentUrl: uploadedUrl, attachmentName: uploadedName } : {}) },
-        durationSeconds: duration, priority: kind === 'emergency' ? 100 : 1,
+        payload: {
+          ...(text.trim() ? { text: text.trim() } : {}), ...(normalizedStreamUrl ? { videoUrl: normalizedStreamUrl } : {}),
+          ...(uploadedUrl ? { attachmentUrl: uploadedUrl, attachmentName: uploadedName } : {}),
+          activationMode, activationAnchor: start.toISOString(),
+          ...(activationMode === 'interval' ? { intervalSeconds: String(Math.round(intervalMinutes * 60)) } : {}),
+          ...(activationMode === 'motion' ? { motionCooldownSeconds: String(motionCooldownSeconds) } : {}),
+        },
+        durationSeconds: kind === 'camera-stream' && activationMode === 'motion' ? motionCooldownSeconds : duration, priority: kind === 'emergency' ? 100 : 1,
         schedule: { displayIds: targetDisplays, startsAt: start.toISOString(), endsAt: end.toISOString(), daysOfWeek: daysOfWeek.length ? daysOfWeek : undefined },
       };
       await api(`/content${item ? `/${encodeURIComponent(item.id)}` : ''}`, jsonInit(item ? 'PUT' : 'POST', content));
@@ -143,11 +157,12 @@ export function ContentEditor({ item, displays, onClose, onSaved }: ContentEdito
                 ))}
               </div>
               {kind === 'emergency' && <p className="inline-alert"><Icon name="alert" size={16} />Acil duyuru, süresi boyunca seçili ekranlardaki tüm diğer yayınları durdurur.</p>}
+              {kind === 'camera-stream' && <p className="field-note">Tetiklenince işlenmiş kamera görüntüsü duyuruların bulunduğu ana yayın alanını kaplar. Tetikleme bitince duyuru döngüsü kaldığı yerden devam eder.</p>}
               <label className="field">Başlık<input autoFocus maxLength={140} onChange={(event) => setTitle(event.target.value)} placeholder="Örn. Bahar şenliği 12 Mayıs’ta başlıyor" required value={title} /><small className="field-count">{title.length}/140</small></label>
-              <label className="field">Açıklama<textarea onChange={(event) => setText(event.target.value)} placeholder="Ekranda gösterilecek metin" rows={3} value={text} /></label>
+              {kind !== 'camera-stream' && <label className="field">Açıklama<textarea onChange={(event) => setText(event.target.value)} placeholder="Ekranda gösterilecek metin" rows={3} value={text} /></label>}
             </section>
 
-            <section className="form-block">
+            {kind !== 'camera-stream' && <section className="form-block">
               <h3><span>2</span>Medya <em>isteğe bağlı</em></h3>
               {fileName ? (
                 <div className="file-row">
@@ -165,7 +180,7 @@ export function ContentEditor({ item, displays, onClose, onSaved }: ContentEdito
                 </label>
               )}
               <label className="field">Canlı yayın adresi<input autoComplete="url" onChange={(event) => { setStreamUrl(event.target.value); if (event.target.value.trim()) setKind('video'); }} placeholder="https://…/playlist.m3u8" type="url" value={streamUrl} /><small>HLS (.m3u8) veya MP4, HTTPS. Yayın cihazda oynatılır, sunucuya aktarılmaz.</small></label>
-            </section>
+            </section>}
 
             <section className="form-block">
               <h3><span>3</span>Zamanlama</h3>
@@ -181,11 +196,14 @@ export function ContentEditor({ item, displays, onClose, onSaved }: ContentEdito
                 </div>
                 <div className="chip-row">{dayPresets.map((preset) => <button className="chip" key={preset.label} onClick={() => setDaysOfWeek(preset.days)} type="button">{preset.label}</button>)}</div>
               </fieldset>
-              <div className="chip-row">
+              {!(kind === 'camera-stream' && activationMode === 'motion') && <div className="chip-row">
                 <span>Ekranda kalma</span>
                 {durationPresets.map((value) => <button className={duration === value ? 'chip active' : 'chip'} key={value} onClick={() => setDuration(value)} type="button">{value} sn</button>)}
                 <label className="chip-input"><input aria-label="Gösterim süresi (saniye)" min="1" onChange={(event) => setDuration(Number(event.target.value))} required type="number" value={duration} /><span>sn</span></label>
-              </div>
+              </div>}
+              <label className="field">Gösterim tetikleyicisi<select onChange={(event) => setActivationMode(event.target.value as ActivationMode)} value={activationMode}>{kind !== 'camera-stream' && <option value="rotation">Sürekli döngüde</option>}<option value="interval">Belirli aralıkla</option><option value="motion">Hareket algılanınca</option></select><small>{kind === 'camera-stream' ? 'Kamera görüntüsü tam ekran gösterilir; yayın süresi hareket tetikleyicisindeki bekleme süresidir.' : 'Aralıklı ve hareket tetiklemeli yayınlar için AI Box kamera ölçümü gerekir.'}</small></label>
+              {activationMode === 'interval' && <label className="field">Tekrar aralığı (dakika)<input min="1" max="1440" onChange={(event) => setIntervalMinutes(Number(event.target.value))} required type="number" value={intervalMinutes} /></label>}
+              {activationMode === 'motion' && <label className="field">Hareket sonrası etkinlik (saniye)<input min="5" max="300" onChange={(event) => setMotionCooldownSeconds(Number(event.target.value))} required type="number" value={motionCooldownSeconds} /><small>Hareket algılandıktan sonra içerik bu süre boyunca döngüye katılır.</small></label>}
             </section>
 
             <section className="form-block">
@@ -211,7 +229,8 @@ export function ContentEditor({ item, displays, onClose, onSaved }: ContentEdito
               <div><dt><Icon name="clock" size={15} />Zaman</dt><dd>{startsAt && endsAt ? `${formatDateTime(startsAt)} → ${formatDateTime(endsAt)}` : '—'}</dd></div>
               <div><dt><Icon name="calendar" size={15} />Günler</dt><dd>{formatDays(daysOfWeek)}</dd></div>
               <div><dt><Icon name="monitor" size={15} />Ekranlar</dt><dd>{selectedNames.length ? selectedNames.join(', ') : 'Seçilmedi'}</dd></div>
-              <div><dt><Icon name="play" size={15} />Gösterim</dt><dd>{duration} saniye</dd></div>
+              <div><dt><Icon name="play" size={15} />Gösterim</dt><dd>{kind === 'camera-stream' && activationMode === 'motion' ? `${motionCooldownSeconds} saniye` : `${duration} saniye`}</dd></div>
+              <div><dt><Icon name="calendar" size={15} />Tetikleyici</dt><dd>{activationMode === 'motion' ? 'Hareket algılanınca' : activationMode === 'interval' ? `Her ${intervalMinutes} dk` : 'Sürekli döngü'}</dd></div>
             </dl>
           </aside>
         </div>

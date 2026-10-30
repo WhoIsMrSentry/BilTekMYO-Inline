@@ -8,7 +8,7 @@ import { StreamVideo } from './stream-video';
 type ConnectionState = 'loading' | 'live' | 'offline';
 
 const typeLabels: Record<DisplayContent['type'], string> = {
-  announcement: 'Duyuru', image: 'Görsel', video: 'Video', 'school-info': 'Okul bilgisi', metrics: 'Canlı veri', emergency: 'Acil duyuru',
+  announcement: 'Duyuru', image: 'Görsel', video: 'Video', 'school-info': 'Okul bilgisi', metrics: 'Canlı veri', emergency: 'Acil duyuru', 'camera-stream': 'Canlı kamera',
 };
 
 function titleSize(title: string): string {
@@ -83,6 +83,8 @@ export default function DisplayPage() {
   const playlistItemsKey = useRef('');
   const [fullscreen, setFullscreen] = useState(false);
   const [pointerIdle, setPointerIdle] = useState(true);
+  const [wallClockMs, setWallClockMs] = useState(0);
+  const [lastMotionAt, setLastMotionAt] = useState(0);
   const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000';
 
   useEffect(() => {
@@ -91,6 +93,13 @@ export default function DisplayPage() {
       setDisplayId(requestedDisplay);
     }
     setHydrated(true);
+  }, []);
+
+  useEffect(() => {
+    const tick = () => setWallClockMs(Date.now());
+    tick();
+    const timer = window.setInterval(tick, 1000);
+    return () => window.clearInterval(timer);
   }, []);
 
   useEffect(() => {
@@ -191,20 +200,49 @@ export default function DisplayPage() {
     };
   }, [apiUrl, loadMetrics]);
 
+  useEffect(() => {
+    const displayCameraId = snapshot?.cameraPreview?.cameraId;
+    const latestMotion = (metricsSnapshot?.cameras ?? [])
+      .filter((metric) => metric.cameraId === displayCameraId && metric.motionDetected)
+      .reduce((latest, metric) => Math.max(latest, Date.parse(metric.capturedAt) || 0), 0);
+    if (latestMotion > lastMotionAt) setLastMotionAt(latestMotion);
+  }, [lastMotionAt, metricsSnapshot, snapshot?.cameraPreview?.cameraId]);
+
   const items = snapshot?.items ?? [];
   const queue = new PlaybackQueue(
     new PlaylistCache(new LocalStorageSnapshotStorage(), `playlist:${displayId}`),
   );
   const cachedItems = hydrated ? queue.currentItems() : [];
   const orderedItems = cachedItems.length > 0 ? cachedItems : items;
-  const slideIndex = currentIndex % Math.max(orderedItems.length, 1);
-  const current = orderedItems[slideIndex];
   const cameraMetrics = metricsSnapshot?.cameras ?? [];
   const latestMetric = cameraMetrics[0];
+  const cameraStreamMetric = cameraMetrics.find((metric) => metric.cameraId === snapshot?.cameraPreview?.cameraId);
+  const isTriggerActive = (item: DisplayContent) => {
+    if (item.type === 'emergency') return true;
+    const mode = item.payload.activationMode ?? 'rotation';
+    if (mode === 'interval') {
+      const intervalMs = Number(item.payload.intervalSeconds) * 1000;
+      const anchor = Date.parse(item.payload.activationAnchor ?? '');
+      if (!Number.isFinite(intervalMs) || intervalMs <= 0 || !Number.isFinite(anchor) || !wallClockMs) return false;
+      const withinInterval = ((wallClockMs - anchor) % intervalMs + intervalMs) % intervalMs;
+      return withinInterval < item.durationSeconds * 1000;
+    }
+    if (mode === 'motion') {
+      const cooldownMs = Math.max(5, Number(item.payload.motionCooldownSeconds) || 15) * 1000;
+      return lastMotionAt > 0 && wallClockMs - lastMotionAt <= cooldownMs;
+    }
+    return true;
+  };
+  const cameraStreamItem = orderedItems.find((item) => item.type === 'camera-stream' && isTriggerActive(item));
+  const cameraStreamActive = Boolean(cameraStreamItem && snapshot?.cameraPreview?.streamUrl);
+  const playbackItems = orderedItems.filter((item) => item.type !== 'camera-stream' && isTriggerActive(item));
+  const slideIndex = currentIndex % Math.max(playbackItems.length, 1);
+  const current = cameraStreamActive ? cameraStreamItem : playbackItems[slideIndex];
   const isEmergency = current?.type === 'emergency';
+  const isCameraStream = current?.type === 'camera-stream';
   const isHoldingStream = /\.m3u8(?:$|[?#])/i.test(current?.payload.videoUrl ?? '');
-  const upNext = orderedItems.length > 1
-    ? Array.from({ length: Math.min(orderedItems.length - 1, 3) }, (_, offset) => orderedItems[(slideIndex + offset + 1) % orderedItems.length]!)
+  const upNext = playbackItems.length > 1
+    ? Array.from({ length: Math.min(playbackItems.length - 1, 3) }, (_, offset) => playbackItems[(slideIndex + offset + 1) % playbackItems.length]!)
     : [];
 
   // Keyed on the slide, not the item object: the cached list is rebuilt on every
@@ -212,18 +250,18 @@ export default function DisplayPage() {
   const currentId = current?.id;
   const currentDuration = current?.durationSeconds;
   useEffect(() => {
-    if (!currentId || !currentDuration || isHoldingStream) return;
+    if (!currentId || !currentDuration || isHoldingStream || isCameraStream) return;
     const timer = window.setTimeout(
-      () => setCurrentIndex((index) => (index + 1) % orderedItems.length),
+      () => setCurrentIndex((index) => (index + 1) % playbackItems.length),
       currentDuration * 1000,
     );
     return () => window.clearTimeout(timer);
-  }, [currentId, currentDuration, slideIndex, isHoldingStream, orderedItems.length]);
+  }, [currentId, currentDuration, slideIndex, isHoldingStream, isCameraStream, playbackItems.length]);
 
   const connectionLabel = connection === 'live' ? 'Yayında' : connection === 'offline' ? 'Bağlantı yok' : 'Bağlanıyor';
 
   return (
-    <main className={`display ${isEmergency ? 'emergency' : ''} ${pointerIdle ? 'pointer-idle' : ''}`}>
+    <main className={`display ${isEmergency ? 'emergency' : ''} ${isCameraStream ? 'camera-live' : ''} ${pointerIdle ? 'pointer-idle' : ''}`}>
       <header className="display-bar">
         <div className="display-brand">
           <span className="brand-mark" />
@@ -236,9 +274,18 @@ export default function DisplayPage() {
         <Clock />
       </header>
 
-      <div className="display-layout">
+      <div className={`display-layout ${isCameraStream ? 'camera-stream-layout' : ''}`}>
         <section className="stage">
-          {current ? (
+          {isCameraStream && snapshot?.cameraPreview ? (
+            <div className="camera-broadcast" key={snapshot.cameraPreview.cameraId}>
+              <img alt={`${snapshot.cameraPreview.cameraId} kamerasından işlenmiş canlı görüntü`} className="camera-broadcast-image" src={`${apiUrl}${snapshot.cameraPreview.streamUrl}`} />
+              <div className="camera-broadcast-overlay">
+                <span className="camera-live-label"><i />CANLI KAMERA · {snapshot.cameraPreview.cameraId}</span>
+                <strong>{cameraStreamMetric?.peopleCount ?? '—'} <small>kişi</small></strong>
+                <time>{cameraStreamMetric ? new Date(cameraStreamMetric.capturedAt).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : ''}</time>
+              </div>
+            </div>
+          ) : current ? (
             <div className="slide" key={`${current.id}:${slideIndex}`}>
               <Slide apiUrl={apiUrl} item={current} />
             </div>
@@ -251,7 +298,7 @@ export default function DisplayPage() {
               </div>
             </div>
           )}
-          {current && orderedItems.length > 1 && !isHoldingStream && (
+          {current && playbackItems.length > 1 && !isHoldingStream && !isCameraStream && (
             <div className="slide-progress" aria-hidden="true">
               <i key={`${current.id}:${slideIndex}`} style={{ animationDuration: `${current.durationSeconds}s` }} />
             </div>
@@ -260,9 +307,9 @@ export default function DisplayPage() {
 
         {!isEmergency && (
           <aside className="rail" aria-label="Sıradaki yayınlar ve canlı sonuçlar">
-            {orderedItems.length > 1 && (
+            {playbackItems.length > 1 && (
               <section className="rail-block">
-                <div className="rail-head"><h2>Sıradaki</h2><span>{slideIndex + 1} / {orderedItems.length}</span></div>
+                <div className="rail-head"><h2>Sıradaki</h2><span>{slideIndex + 1} / {playbackItems.length}</span></div>
                 <ol className="up-next">
                   {upNext.map((item, index) => <li key={`${item.id}:${index}`}><span>{typeLabels[item.type]}</span><strong>{item.title}</strong></li>)}
                 </ol>
@@ -276,6 +323,12 @@ export default function DisplayPage() {
               {latestMetric ? (
                 <>
                   <div className="metrics-hero"><strong>{latestMetric.peopleCount}</strong><span>kişi<small>{latestMetric.cameraId}</small></span></div>
+                  {latestMetric.genderDistribution && <div className="demographic-summary" aria-label="Tahmini demografik sayaçlar">
+                    <div><small>Kadın tahmini</small><strong>{latestMetric.genderDistribution.female}</strong></div>
+                    <div><small>Erkek tahmini</small><strong>{latestMetric.genderDistribution.male}</strong></div>
+                    <div><small>Belirsiz</small><strong>{latestMetric.genderDistribution.unknown}</strong></div>
+                  </div>}
+                  {latestMetric.genderDistribution && latestMetric.genderDistribution.unknown >= latestMetric.peopleCount && <p className="model-note">Yüklü YOLOX modeli yalnızca kişi algılar; cinsiyet sınıflandırması yapmaz.</p>}
                   <table className="metrics-table">
                     <thead><tr><th>Kamera</th><th>Kişi</th><th>Giriş</th><th>Çıkış</th><th>Doluluk</th></tr></thead>
                     <tbody>
