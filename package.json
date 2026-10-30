@@ -1,0 +1,17 @@
+{
+  "name": "biltekmyo-inline",
+  "private": true,
+  "packageManager": "pnpm@9.15.0",
+  "scripts": {
+    "build": "pnpm -r build",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test",
+    "lint": "pnpm -r lint",
+    "dev:up": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/dev.ps1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "@types/pg": "^8.11.10",
+    "typescript": "^5.7.3"
+  }
+}
