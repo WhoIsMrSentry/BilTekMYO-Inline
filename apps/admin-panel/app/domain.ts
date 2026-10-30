@@ -2,7 +2,7 @@ import type { IconName } from './icons';
 
 export type Display = { id: string; name: string; location: string; enabled: boolean };
 export type AiBox = { id: string; name: string; cameraIds: [string, string]; lastHeartbeatAt?: string; lastMetricsAt?: string };
-export type ContentType = 'announcement' | 'image' | 'video' | 'school-info' | 'metrics' | 'emergency';
+export type ContentType = 'announcement' | 'image' | 'video' | 'school-info' | 'metrics' | 'emergency' | 'camera-stream';
 export type Content = {
   id: string; type: ContentType;
   title: string; payload: Record<string, string>; durationSeconds: number; priority: number;
@@ -28,6 +28,7 @@ export const typeMeta: Record<ContentType, { label: string; hint: string; icon: 
   video: { label: 'Video', hint: 'MP4 ya da canlı yayın', icon: 'video' },
   emergency: { label: 'Acil duyuru', hint: 'Diğer yayınları durdurur', icon: 'alert' },
   metrics: { label: 'Metrik', hint: 'Canlı sayaç ekranı', icon: 'chart' },
+  'camera-stream': { label: 'Kamera yayını', hint: 'İşlenmiş görüntüyü tam ekrana alır', icon: 'camera' },
 };
 export const statusMeta: Record<ContentStatus, string> = { live: 'Yayında', scheduled: 'Planlı', ended: 'Bitti' };
 
