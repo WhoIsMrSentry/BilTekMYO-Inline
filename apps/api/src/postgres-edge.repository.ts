@@ -1,6 +1,6 @@
 import { Injectable, OnModuleDestroy } from '@nestjs/common';
 import { Pool } from 'pg';
-import type { DeviceHeartbeat, DisplayMetricsSnapshot, MetricsEvent } from '@biltekmyo/shared-types';
+import type { AnonymousMetrics, DeviceHeartbeat, DisplayMetricsSnapshot, MetricsEvent } from '@biltekmyo/shared-types';
 import type { EdgeRepository } from './edge-repository.js';
 import type { RegisteredAiBox } from './edge-registry.service.js';
 
@@ -19,6 +19,8 @@ type DisplayMetricRow = {
   entries: number;
   exits: number;
   estimated_occupancy: number;
+  motion_detected: boolean;
+  gender_distribution: AnonymousMetrics['genderDistribution'];
 };
 
 @Injectable()
@@ -77,9 +79,9 @@ export class PostgresEdgeRepository implements EdgeRepository, OnModuleDestroy {
     const result = await this.pool.query(
       `INSERT INTO metrics_events (
         ai_box_id, camera_id, captured_at, people_count, entries, exits,
-        estimated_occupancy, gender_distribution, mood_distribution
+        estimated_occupancy, gender_distribution, mood_distribution, motion_detected
       )
-      SELECT $1, c.id, $3, $4, $5, $6, $7, $8::jsonb, $9::jsonb
+      SELECT $1, c.id, $3, $4, $5, $6, $7, $8::jsonb, $9::jsonb, $10
       FROM cameras c
       WHERE c.id = $2 AND c.ai_box_id = $1
       RETURNING id`,
@@ -93,6 +95,7 @@ export class PostgresEdgeRepository implements EdgeRepository, OnModuleDestroy {
         event.metrics.estimatedOccupancy,
         JSON.stringify(event.metrics.genderDistribution),
         JSON.stringify(event.metrics.moodDistribution),
+        event.motionDetected ?? false,
       ],
     );
     if (result.rowCount !== 1) {
@@ -107,7 +110,8 @@ export class PostgresEdgeRepository implements EdgeRepository, OnModuleDestroy {
   async displayMetrics(): Promise<DisplayMetricsSnapshot> {
     const result = await this.pool.query<DisplayMetricRow>(
       `SELECT DISTINCT ON (ai_box_id, camera_id)
-         ai_box_id, camera_id, captured_at, people_count, entries, exits, estimated_occupancy
+         ai_box_id, camera_id, captured_at, people_count, entries, exits, estimated_occupancy,
+         motion_detected, gender_distribution
        FROM metrics_events
        ORDER BY ai_box_id, camera_id, captured_at DESC, id DESC`,
     );
@@ -123,8 +127,18 @@ export class PostgresEdgeRepository implements EdgeRepository, OnModuleDestroy {
           entries: row.entries,
           exits: row.exits,
           estimatedOccupancy: row.estimated_occupancy,
+          motionDetected: row.motion_detected,
+          genderDistribution: row.gender_distribution,
         })),
     };
+  }
+
+  async hasCamera(aiBoxId: string, cameraId: string): Promise<boolean> {
+    const result = await this.pool.query(
+      'SELECT 1 FROM cameras WHERE ai_box_id = $1 AND id = $2 AND enabled = TRUE',
+      [aiBoxId, cameraId],
+    );
+    return result.rowCount === 1;
   }
 
   async list(): Promise<RegisteredAiBox[]> {

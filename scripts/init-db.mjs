@@ -14,10 +14,10 @@ try {
     version TEXT PRIMARY KEY,
     applied_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
   )`);
-  const migration = '001_initial_schema.sql';
-  const applied = await client.query('SELECT 1 FROM schema_migrations WHERE version = $1', [migration]);
-  if (applied.rowCount === 0) {
-    const sql = await readFile(resolve('infrastructure/postgres/001_initial_schema.sql'), 'utf8');
+  for (const migration of ['001_initial_schema.sql', '002_motion_metrics.sql']) {
+    const applied = await client.query('SELECT 1 FROM schema_migrations WHERE version = $1', [migration]);
+    if (applied.rowCount !== 0) continue;
+    const sql = await readFile(resolve('infrastructure/postgres', migration), 'utf8');
     await client.query('BEGIN');
     try {
       await client.query(sql);
