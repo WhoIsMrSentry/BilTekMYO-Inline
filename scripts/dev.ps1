@@ -165,7 +165,7 @@ $logDirectory = Join-Path $root 'var\logs'
 New-Item -ItemType Directory -Force -Path $logDirectory | Out-Null
 $services = @(
   @{ Name = 'BilTekMYO API'; Directory = $root; Port = $apiPort; Script = "`$env:PORT='$apiPort'; `$env:ADMIN_PANEL_ORIGIN='$adminOrigin'; Set-Location -LiteralPath '$root'; node apps/api/dist/main.js *>&1 | Tee-Object -FilePath '$logDirectory\api.log' -Append" },
-  @{ Name = 'BilTekMYO Admin'; Directory = (Join-Path $root 'apps\admin-panel'); Port = $adminPort; Script = "`$env:NEXT_PUBLIC_API_URL='$apiUrl'; `$env:NEXT_DIST_DIR='.next-dev-$adminPort'; Set-Location -LiteralPath '$(Join-Path $root 'apps\admin-panel')'; node node_modules/next/dist/bin/next dev --port $adminPort *>&1 | Tee-Object -FilePath '$logDirectory\admin.log' -Append" },
+  @{ Name = 'BilTekMYO Admin'; Directory = (Join-Path $root 'apps\admin-panel'); Port = $adminPort; Script = "`$env:NEXT_PUBLIC_API_URL='$apiUrl'; `$env:NEXT_PUBLIC_PLAYER_URL='http://localhost:$playerPort'; `$env:NEXT_DIST_DIR='.next-dev-$adminPort'; Set-Location -LiteralPath '$(Join-Path $root 'apps\admin-panel')'; node node_modules/next/dist/bin/next dev --port $adminPort *>&1 | Tee-Object -FilePath '$logDirectory\admin.log' -Append" },
   @{ Name = 'BilTekMYO Player'; Directory = (Join-Path $root 'apps\display-player'); Port = $playerPort; Script = "`$env:NEXT_PUBLIC_API_URL='$apiUrl'; `$env:NEXT_DIST_DIR='.next-dev-$playerPort'; Set-Location -LiteralPath '$(Join-Path $root 'apps\display-player')'; node node_modules/next/dist/bin/next dev --port $playerPort *>&1 | Tee-Object -FilePath '$logDirectory\player.log' -Append" }
 )
 foreach ($service in $services) {

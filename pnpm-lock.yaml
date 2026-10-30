@@ -18,25 +18,11 @@ importers:
         specifier: ^5.7.3
         version: 5.9.3
 
-  ackages/protocol:
+  apps/admin-panel:
     dependencies:
       '@biltekmyo/shared-types':
         specifier: workspace:*
-        version: link:..shared-types
-
-  ackages/shared-types: {}
-
-  ervices/scheduler:
-    dependencies:
-      '@biltekmyo/shared-types':
-        specifier: workspace:*
-        version: link:../..packages/shared-types
-
-  pps/admin-panel:
-    dependencies:
-      '@biltekmyo/shared-types':
-        specifier: workspace:*
-        version: link:../..packages/shared-types
+        version: link:../../packages/shared-types
       next:
         specifier: ^15.1.0
         version: 15.5.28(@types/node@22.20.5)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
@@ -54,14 +40,14 @@ importers:
         specifier: ^19.0.0
         version: 19.3.0(@types/react@19.3.0)
 
-  pps/api:
+  apps/api:
     dependencies:
       '@biltekmyo/scheduler':
         specifier: workspace:*
-        version: link:../..services/scheduler
+        version: link:../../services/scheduler
       '@biltekmyo/shared-types':
         specifier: workspace:*
-        version: link:../..packages/shared-types
+        version: link:../../packages/shared-types
       '@nestjs/common':
         specifier: ^11.0.0
         version: 11.2.8(reflect-metadata@0.2.2)(rxjs@7.8.2)
@@ -81,11 +67,11 @@ importers:
         specifier: ^7.8.2
         version: 7.8.2
 
-  pps/display-player:
+  apps/display-player:
     dependencies:
       '@biltekmyo/shared-types':
         specifier: workspace:*
-        version: link:../..packages/shared-types
+        version: link:../../packages/shared-types
       hls.js:
         specifier: ^1.7.3
         version: 1.7.3
@@ -105,6 +91,20 @@ importers:
       '@types/react-dom':
         specifier: ^19.0.0
         version: 19.3.0(@types/react@19.3.0)
+
+  packages/protocol:
+    dependencies:
+      '@biltekmyo/shared-types':
+        specifier: workspace:*
+        version: link:../shared-types
+
+  packages/shared-types: {}
+
+  services/scheduler:
+    dependencies:
+      '@biltekmyo/shared-types':
+        specifier: workspace:*
+        version: link:../../packages/shared-types
 
 packages:
 
