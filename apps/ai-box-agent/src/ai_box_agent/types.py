@@ -24,6 +24,7 @@ class AiBoxConfig:
     model_version: str
     retain_frames: bool = False
     retention_seconds: int = 0
+    publish_preview: bool = False
 
     def __post_init__(self) -> None:
         if len(self.cameras) != 2:
@@ -46,6 +47,7 @@ class MetricsEvent(TypedDict):
     aiBoxId: str
     cameraId: str
     capturedAt: str
+    motionDetected: bool
     metrics: AnonymousMetrics
 
 

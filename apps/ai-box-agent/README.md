@@ -55,14 +55,14 @@ CPU tabanlı kamera denemesi Windows ve Linux'ta aynı komutla çalışır:
 
 ```powershell
 python -m pip install -e "apps/ai-box-agent[camera-cpu]"
-python apps/ai-box-agent/scripts/camera_test.py --model models/pretrained/yolox_tiny.onnx --camera 0 --provider auto
+python apps/ai-box-agent/scripts/camera_test.py --model models/pretrained/yolox_nano.onnx --camera 0 --provider auto
 ```
 
 Linux/macOS shell'de pip extra komutu:
 
 ```sh
 python -m pip install -e 'apps/ai-box-agent[camera-cpu]'
-python apps/ai-box-agent/scripts/camera_test.py --model models/pretrained/yolox_tiny.onnx --camera 0 --provider auto
+python apps/ai-box-agent/scripts/camera_test.py --model models/pretrained/yolox_nano.onnx --camera 0 --provider auto
 ```
 
 Önizleme penceresi algılanan kişileri ve FPS'i gösterir; kareler diske
@@ -70,3 +70,33 @@ yazılmaz. `Q` veya `Esc` ile kapatılır. `--provider` seçeneği `cpu`, `cuda`
 `directml`, `tensorrt` veya `auto` kabul eder; seçilen sağlayıcı kurulu değilse
 açık hata verir. DGX Spark için ONNX'ten cihaz üzerinde TensorRT engine üretimi
 ve AI Box agent'a üretim bağlantısı sonraki adımdır.
+
+### İşlenmiş kareyi yayın ekranında gösterme
+
+Yerel kamerayı YOLOX ile işleyip kişi kutuları çizilmiş düşük çözünürlüklü
+kareleri (varsayılan en fazla 20 FPS) ve anonim ölçümü API'ye gönderebilirsiniz.
+API aktarımı kamera görüntüsünü durdurmaması için ayrı bir iş parçacığında yapılır;
+bekleyen eski kareler atılır ve en güncel kare tutulur. Kareler dosyaya yazılmaz;
+API yalnızca son kareyi 15 saniyeye kadar bellekte tutar. Yayın adresi ekran
+başına imzalanır ve 90 saniyede yenilenir. Kameradan gelen görüntü kampüs
+ekranında görüleceği için `--publish-preview` seçeneğini yalnızca bu yayına
+izin verilen ekranda kullanın.
+
+PowerShell:
+
+```powershell
+python -m pip install -e 'apps/ai-box-agent[camera-cpu]'
+$env:AI_BOX_API_KEY = (Get-Content .env | Where-Object { $_ -match '^AI_BOX_API_KEY=' } | Select-Object -First 1).Split('=', 2)[1]
+python apps/ai-box-agent/scripts/camera_test.py --model models/pretrained/yolox_nano.onnx --camera 0 --provider auto --cpu-threads 2 --preview-fps 20 --publish-preview --api-url http://localhost:3000
+```
+
+Ardından `http://localhost:3002/?display=display-01` ekranını açın. Tetiklenince
+OpenCV işlenmiş kareleri MJPEG canlı akışı olarak yalnızca ana duyuru alanında
+gösterir; üst bilgi, sıradaki yayınlar ve analiz paneli görünür kalır.
+Kamerayı durdurmak için önizleme penceresinde `Q` veya `Esc` tuşuna basın.
+
+`--publish-preview` kapalıyken kamera kareleri API'ye gönderilmez. Kurulu
+YOLOX COCO modelleri kişi algılar; cinsiyet sınıflandırması üretmez. Böyle bir
+çıktı mevcut olmadığı için kadın/erkek sayıları tahmin edilmez ve kişiler
+“belirsiz” altında gösterilir. Metrik aktarım sözleşmesi yalnızca aynı izleme
+kimliğiyle eşleşen, gerçekten üretilmiş sınıflandırmaları sayar.
