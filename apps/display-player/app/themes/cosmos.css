@@ -1,0 +1,48 @@
+/* Kozmos: display ekranı temanın gösterişli yüzüdür, gösteriş arka plandaki galaksidedir.
+   Metin katmanı düz ve opak tutulur: başlık gradyansız, paneller koyu, acil durum galaksiyi tamamen örter. */
+:root[data-palette='cosmos'] {
+  color-scheme: dark;
+  --font-family: var(--font-ui);
+  --font-heading: var(--font-mono);
+  --galaxy-warm: #dfe6f0 #a8b8cc #6c7f98 #f2f5f9;
+  --galaxy-cool: #9fd8ff #6fb7e6 #4a7fa8 #d2ecff;
+
+  --canvas: #050608;
+  --canvas-bg: transparent;
+  --panel: rgba(10, 11, 14, .84);
+  --panel-2: rgba(36, 40, 47, .72);
+  --panel-blur: 10px;
+  --line: rgba(255, 255, 255, .13);
+  --text: #f2f4f7;
+  --text-2: #cdd2da;
+  --text-3: #a3a9b3;
+  --glow: #9fd8ff;
+  --bar-bg: rgba(8, 9, 12, .82);
+  --on-bar-soft: #f2f4f7;
+  --stage-bg: linear-gradient(120deg, rgba(8, 9, 12, .78), rgba(8, 9, 12, .6) 60%, rgba(8, 9, 12, .42));
+  --stage-glow: inset 0 0 0 1px rgba(255, 255, 255, .1), 0 0 70px rgba(159, 216, 255, .09);
+  --progress-bg: linear-gradient(90deg, #6fb7e6, #d2ecff, #6fb7e6, #d2ecff);
+  --flow-motion: gradient-flow 9s linear infinite;
+  --slide-enter: warp .5s cubic-bezier(.16, .8, .24, 1);
+  --title-bg: linear-gradient(#f7f9fb, #f7f9fb);
+  --wordmark-bg: linear-gradient(#f2f4f7, #f2f4f7);
+  --chip-bg: rgba(159, 216, 255, .13);
+  --title-motion: none;
+  --title-filter: none;
+  --media-bg: #050608;
+  --media-fade: rgba(5, 6, 8, .94);
+  --veil: rgba(8, 9, 12, .92);
+  --offline-bg: #b3261e;
+  --offline-fg: #fff;
+  --alert-canvas: #7a120c;
+  --alert-1: #c62f26;
+  --alert-2: #8f1a13;
+  --alert-ring: #fff;
+  --alert-ring-dim: rgba(255, 255, 255, .25);
+  --alert-bar: #7a120c;
+  --alert-bar-fg: #ffe3e0;
+  --alert-fg: #fff;
+  --alert-soft: #ffe3e0;
+  --alert-chip-bg: #fff;
+  --alert-chip-fg: #a31f18;
+}

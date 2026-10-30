@@ -1,0 +1,46 @@
+/* Gözlemevi: petrol yeşili gökyüzünde altın ve turkuaz bir galaksi.
+   Başlık kremden altına akan bir parıltı taşır; metin koyu petrol paneller üzerinde kalır. */
+:root[data-palette='observatory'] {
+  color-scheme: dark;
+  --font-family: var(--font-ui);
+  --font-heading: var(--font-serif);
+  --galaxy-warm: #e8c36a #c99a3c #8a6a24 #fff0c9;
+  --galaxy-cool: #3fc1b0 #1f8f86 #0f6a66 #bff0e6;
+
+  --canvas: #061416;
+  --canvas-bg: transparent;
+  --panel: rgba(8, 26, 28, .82);
+  --panel-2: linear-gradient(120deg, rgba(224, 184, 96, .2), rgba(15, 106, 102, .36));
+  --panel-blur: 10px;
+  --line: rgba(224, 184, 96, .24);
+  --text: #f1eee2;
+  --text-2: #d4dcd2;
+  --text-3: #a6b8b0;
+  --glow: #e8c36a;
+  --bar-bg: linear-gradient(100deg, rgba(8, 26, 28, .9), rgba(15, 56, 58, .8));
+  --on-bar-soft: #f1eee2;
+  --stage-bg: linear-gradient(125deg, rgba(8, 26, 28, .78), rgba(8, 26, 28, .58) 60%, rgba(8, 26, 28, .42));
+  --stage-glow: inset 0 0 0 1px rgba(224, 184, 96, .3), 0 0 80px rgba(63, 193, 176, .1);
+  --progress-bg: linear-gradient(90deg, #8a6a24, #fff0c9, #e8c36a, #3fc1b0);
+  --flow-motion: gradient-flow 11s linear infinite;
+  --slide-enter: warp .5s cubic-bezier(.16, .8, .24, 1);
+  --title-bg: linear-gradient(100deg, #fff4d6, #f0cf85 25%, #fff4d6 50%, #e8c36a 75%, #fff4d6);
+  --wordmark-bg: linear-gradient(100deg, #f0cf85, #fff4d6 50%, #f0cf85);
+  --chip-bg: rgba(224, 184, 96, .14);
+  --media-bg: #061416;
+  --media-fade: rgba(6, 20, 22, .94);
+  --veil: rgba(8, 26, 28, .92);
+  --offline-bg: #b3261e;
+  --offline-fg: #fff;
+  --alert-canvas: #7a120c;
+  --alert-1: #c62f26;
+  --alert-2: #8f1a13;
+  --alert-ring: #fff;
+  --alert-ring-dim: rgba(255, 255, 255, .25);
+  --alert-bar: #7a120c;
+  --alert-bar-fg: #ffe3e0;
+  --alert-fg: #fff;
+  --alert-soft: #ffe3e0;
+  --alert-chip-bg: #fff;
+  --alert-chip-fg: #a31f18;
+}
