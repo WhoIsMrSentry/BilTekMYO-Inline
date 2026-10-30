@@ -11,6 +11,7 @@ export function ScreenPreview({ type, title, text, mediaUrl, mediaKind, idle = '
   return (
     <div className={`screen ${type === 'emergency' ? 'screen-emergency' : ''} ${hasMedia ? 'screen-media' : ''}`}>
       {mediaKind === 'image' && mediaUrl && <img alt="" src={mediaUrl} />}
+      {type === 'camera-stream' && <span className="screen-media-icon"><Icon name="camera" size={26} /></span>}
       {mediaKind && mediaKind !== 'image' && <span className="screen-media-icon"><Icon name={mediaKind === 'document' ? 'file' : 'video'} size={26} /></span>}
       <div className="screen-copy">
         <span className="screen-chip">{type === 'emergency' ? 'ACİL DUYURU' : typeMeta[type].label}</span>

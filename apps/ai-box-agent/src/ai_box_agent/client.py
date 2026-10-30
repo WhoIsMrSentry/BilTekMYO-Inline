@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import base64
 from urllib import request
 
 from .types import DeviceHeartbeat, MetricsEvent
@@ -20,6 +21,16 @@ class ApiClient:
 
     def send_metrics(self, event: MetricsEvent) -> None:
         self._post("/edge/metrics", event)
+
+    def send_camera_frame(self, ai_box_id: str, camera_id: str, captured_at: str, jpeg: bytes) -> None:
+        if len(jpeg) > 64 * 1024:
+            raise ValueError("Camera preview frame must not exceed 64 KB.")
+        self._post("/edge/camera-frames", {
+            "aiBoxId": ai_box_id,
+            "cameraId": camera_id,
+            "capturedAt": captured_at,
+            "jpegBase64": base64.b64encode(jpeg).decode("ascii"),
+        })
 
     def _post(self, path: str, payload: dict[str, object]) -> None:
         if not self.api_key:

@@ -10,6 +10,7 @@ from .types import AnonymousMetrics
 class Detection:
     class_name: Literal["person", "female", "male", "happy", "neutral", "sad", "angry", "unknown"]
     confidence: float
+    track_id: int | None = None
 
 
 class MetricsAggregator:
@@ -55,10 +56,13 @@ class MetricsAggregator:
         person: Detection,
         classes: tuple[str, ...],
     ) -> str | None:
-        del person
+        if person.track_id is None:
+            return None
         candidates = [
             item for item in detections
-            if item.class_name in classes and item.confidence >= self.confidence_threshold
+            if item.class_name in classes
+            and item.confidence >= self.confidence_threshold
+            and item.track_id == person.track_id
         ]
         if not candidates:
             return None

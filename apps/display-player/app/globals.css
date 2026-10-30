@@ -106,6 +106,11 @@ h1 { max-width: 22ch; background: var(--title-bg); background-size: 220% 100%; -
 .metrics-hero strong { color: #fff; font-size: 3.6em; font-weight: 700; line-height: 1; letter-spacing: 0; }
 .metrics-hero > span { padding-bottom: .3em; color: var(--text-2); font-weight: 600; }
 .metrics-hero small { display: block; color: var(--text-3); font-size: .85em; font-weight: 500; }
+.demographic-summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.demographic-summary > div { display: flex; min-width: 0; align-items: baseline; justify-content: space-between; gap: 5px; padding: 8px 9px; border: 1px solid var(--line); border-radius: 8px; background: rgba(255,255,255,.025); }
+.demographic-summary small { color: var(--text-3); font-size: clamp(9px, .72vw, 14px); }
+.demographic-summary strong { color: var(--text); font-size: clamp(14px, 1.1vw, 22px); font-variant-numeric: tabular-nums; }
+.model-note { color: #d7c7a2; font-size: clamp(10px, .75vw, 15px); line-height: 1.35; }
 .metrics-table { width: 100%; border-collapse: collapse; color: var(--text-2); font-size: clamp(11px, .85vw, 19px); text-align: right; white-space: nowrap; }
 .metrics-table th { padding: .4em .3em; border-bottom: 1px solid var(--line); color: var(--text-3); font-weight: 600; }
 .metrics-table td { padding: .55em .3em; border-bottom: 1px solid var(--line); font-variant-numeric: tabular-nums; }
@@ -114,6 +119,19 @@ h1 { max-width: 22ch; background: var(--title-bg); background-size: 220% 100%; -
 .metric-number { color: #fff; font-weight: 700; }
 .metrics-empty { color: var(--text-2); font-size: clamp(13px, 1vw, 22px); line-height: 1.4; }
 .privacy-label { margin-top: auto; color: var(--text-3); font-size: clamp(11px, .8vw, 17px); }
+
+/* A triggered camera item occupies the announcement stage while the kiosk UI stays visible. */
+.camera-stream-layout { grid-template-columns: minmax(0, 1fr) clamp(280px, 25vw, 640px); }
+.camera-live .stage { background: #030807; }
+.camera-broadcast { position: absolute; inset: 0; overflow: hidden; background: #030807; }
+.camera-broadcast-image { display: block; width: 100%; height: 100%; object-fit: cover; }
+.camera-broadcast-overlay { position: absolute; right: clamp(18px, 3vw, 64px); bottom: clamp(18px, 3vh, 48px); left: clamp(18px, 3vw, 64px); display: flex; align-items: center; gap: clamp(12px, 2vw, 36px); color: #fff; text-shadow: 0 1px 10px rgba(0,0,0,.55); }
+.camera-live-label { display: inline-flex; align-items: center; gap: 9px; padding: 9px 14px; border: 1px solid rgba(255,255,255,.22); border-radius: 999px; background: rgba(3,8,7,.62); font-size: clamp(12px, 1vw, 20px); font-weight: 700; letter-spacing: .08em; }
+.camera-live-label i { width: 8px; height: 8px; border-radius: 50%; background: #54dba0; box-shadow: 0 0 12px #54dba0; }
+.camera-broadcast-overlay > strong { margin-left: auto; font-size: clamp(28px, 4vw, 76px); font-variant-numeric: tabular-nums; }
+.camera-broadcast-overlay > strong small { font-size: .36em; font-weight: 600; }
+.camera-broadcast-overlay time { color: rgba(255,255,255,.82); font-size: clamp(13px, 1vw, 20px); font-variant-numeric: tabular-nums; }
+.camera-live .fullscreen-toggle { z-index: 3; }
 
 /* Emergency takes the whole canvas and cannot be missed from across a hallway. */
 .display.emergency { background: var(--alert-canvas); }
