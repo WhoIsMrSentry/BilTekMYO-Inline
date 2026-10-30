@@ -39,7 +39,15 @@ export type MetricsEvent = {
   aiBoxId: string;
   cameraId: string;
   capturedAt: string;
+  motionDetected?: boolean;
   metrics: AnonymousMetrics;
+};
+
+export type CameraFrameEvent = {
+  aiBoxId: string;
+  cameraId: string;
+  capturedAt: string;
+  jpegBase64: string;
 };
 
 export type DisplayCameraMetrics = {
@@ -50,6 +58,8 @@ export type DisplayCameraMetrics = {
   entries: number;
   exits: number;
   estimatedOccupancy: number;
+  motionDetected?: boolean;
+  genderDistribution?: AnonymousMetrics['genderDistribution'];
 };
 
 export type DisplayMetricsSnapshot = {
@@ -67,7 +77,7 @@ export type DeviceHeartbeat = {
 
 export type DisplayContent = {
   id: string;
-  type: 'announcement' | 'image' | 'video' | 'school-info' | 'metrics' | 'emergency';
+  type: 'announcement' | 'image' | 'video' | 'school-info' | 'metrics' | 'emergency' | 'camera-stream';
   title: string;
   payload: Record<string, string>;
   durationSeconds: number;
@@ -78,6 +88,7 @@ export type PlaylistSnapshot = {
   version: string;
   generatedAt: string;
   items: DisplayContent[];
+  cameraPreview?: { cameraId: string; streamUrl: string };
 };
 
 export type DisplayConfig = {

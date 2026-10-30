@@ -65,6 +65,7 @@ CREATE TABLE metrics_events (
     estimated_occupancy INTEGER NOT NULL CHECK (estimated_occupancy >= 0),
     gender_distribution JSONB NOT NULL,
     mood_distribution JSONB NOT NULL,
+    motion_detected BOOLEAN NOT NULL DEFAULT FALSE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 

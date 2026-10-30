@@ -35,6 +35,10 @@ export class InMemoryEdgeRepository implements EdgeRepository {
     if (this.metrics.length > 100) this.metrics.shift();
   }
 
+  async hasCamera(aiBoxId: string, cameraId: string): Promise<boolean> {
+    return this.boxes.get(aiBoxId)?.cameraIds.includes(cameraId) ?? false;
+  }
+
   async displayMetrics(): Promise<DisplayMetricsSnapshot> {
     const latest = new Map<string, MetricsEvent>();
     for (const event of [...this.metrics].sort((a, b) => b.capturedAt.localeCompare(a.capturedAt))) {
@@ -51,6 +55,8 @@ export class InMemoryEdgeRepository implements EdgeRepository {
         entries: event.metrics.entries,
         exits: event.metrics.exits,
         estimatedOccupancy: event.metrics.estimatedOccupancy,
+        motionDetected: event.motionDetected ?? false,
+        genderDistribution: event.metrics.genderDistribution,
       })),
     };
   }
