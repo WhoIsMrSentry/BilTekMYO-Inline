@@ -1,0 +1,30 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-biltekmyo}
+      POSTGRES_USER: ${POSTGRES_USER:-biltekmyo}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-biltekmyo-development-only}
+    ports:
+      - "5432:5432"
+    volumes:
+      - biltekmyo-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-biltekmyo} -d ${POSTGRES_DB:-biltekmyo}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  document-converter:
+    build:
+      context: ./document-converter
+    ports:
+      - "127.0.0.1:3030:3030"
+    healthcheck:
+      test: ["CMD", "python", "-c", "from urllib.request import urlopen; urlopen('http://127.0.0.1:3030/health', timeout=2)"]
+      interval: 10s
+      timeout: 3s
+      retries: 6
+
+volumes:
+  biltekmyo-postgres:
