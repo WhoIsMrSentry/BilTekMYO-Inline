@@ -1,0 +1,437 @@
+BilTekMYO İnline - Proje Günlüğü
+================================
+
+Son güncelleme: 2026-10-28 14:31:32 +03:00
+
+1. Proje amacı
+--------------
+Okul içindeki iki büyük ekranda zamanlanmış duyuru, bilgilendirme, etkinlik,
+okul tanıtımı ve anonim analiz ekranlarını yayınlayan; içerik, cihaz ve yayın
+akışlarının yönetim panelinden kontrol edildiği modüler bir platform.
+
+2. Sabit kararlar
+-----------------
+- Kartlı geçiş, turnike ve benzeri geçiş sistemi entegrasyonu kapsam dışıdır.
+- Tek bir AI Box kullanılacaktır.
+- AI Box'a iki kamera bağlanacaktır.
+- Kamera kaynakları USB ve RTSP olarak desteklenecektir.
+- Bilgisayarlı görü AI Box üzerinde, merkeze ham görüntü göndermeden çalışacaktır.
+- Ham görüntü saklama politikası yapılandırılabilir olacaktır; varsayılan toplu
+  anonim metrik yaklaşımıdır.
+- Ekran ortamı karma olabilir; player cihazdan bağımsız web tabanlı çalışacaktır.
+- Merkezi teknoloji hedefi Next.js + NestJS + PostgreSQL'dir.
+- AI Box donanımı NVIDIA DGX Spark olarak sabitlenmiştir.
+- DGX Spark üzerinde varsayılan inference backend TensorRT olacaktır; model ve
+  runtime uyumluluğu doğrulanmadan paket/model kilitlenmeyecektir.
+
+3. Hedef mimari
+---------------
+- apps/admin-panel: içerik, ekran, yayın, cihaz ve rapor yönetimi
+- apps/display-player: büyük ekranlarda çalışan offline-cache destekli player
+- apps/api: merkezi NestJS API
+- apps/ai-box-agent: iki kamera ve yerel inference işleten Python agent
+- packages/shared-types: ortak veri sözleşmeleri
+- packages/protocol: cihaz ve yayın iletişim sözleşmeleri
+- services/analytics: anonim metrik toplama ve raporlama
+- services/scheduler: playlist ve öncelik çözümleme
+- infrastructure: PostgreSQL, Redis ve çalışma ortamı yapılandırmaları
+- models: model metadata ve model dağıtım dokümantasyonu
+
+4. Tamamlananlar
+----------------
+[2026-10-28 14:22:28 +03:00]
+- Proje kapsamı ve sabit kararlar belirlendi.
+- Tek AI Box + iki kamera mimarisi kararlaştırıldı.
+- USB ve RTSP kamera kaynakları için adapter yaklaşımı kararlaştırıldı.
+- Ham görüntünün merkezileştirilmemesi ve anonim metrik yaklaşımı belirlendi.
+- İlk monorepo iskeleti oluşturuluyor.
+- İlk ortak edge protokolü tanımlanıyor.
+
+[2026-10-28 14:25:00 +03:00]
+- pnpm monorepo workspace oluşturuldu.
+- shared-types paketi ile AI Box, kamera, anonim metrik, heartbeat ve playlist
+  veri sözleşmeleri eklendi.
+- protocol paketi ile edge ve display mesaj türleri eklendi.
+- API tarafında tek AI Box'a tam iki kamera zorunluluğunu doğrulayan registry
+  temeli eklendi.
+- Display player tarafında playlist cache temeli eklendi.
+- İlk doğrulama denemesi TypeScript derleyicisi workspace'e eklenmediği için
+  başarısız oldu; kök devDependency olarak TypeScript ekleniyor.
+
+[2026-10-28 14:29:00 +03:00]
+- TypeScript workspace bağımlılığı eklendi.
+- Paket export/type tanımları eklendi.
+- Doğrudan TypeScript compiler ile shared-types, protocol, API ve display
+  player derlemeleri başarıyla doğrulandı.
+- Windows ortamındaki Unicode çalışma yolu nedeniyle pnpm'in oluşturduğu
+  launcher doğrudan çalışmadı; doğrulama aynı compiler'ın gerçek yolu ile
+  tamamlandı.
+
+[2026-10-28 14:25:20 +03:00]
+- Proje kökünde Git deposu `git init` ile başlatıldı.
+- İlk dal adı mevcut Git varsayılanı olarak `master` durumunda.
+- İlk Git commit'i henüz oluşturulmadı; bir sonraki adımda kullanıcı onayıyla
+  veya doğrudan ilk anlamlı modül tamamlandığında oluşturulabilir.
+
+[2026-10-28 14:27:31 +03:00]
+- İkinci adım başlatıldı: merkezi API gerçek NestJS modül yapısına taşındı.
+- AI Box kayıt, heartbeat, anonim metrik alma ve AI Box listeleme endpoint'leri
+  eklendi.
+- API katmanında tek AI Box'ın tam iki kayıtlı kameraya sahip olması ve gelen
+  kameranın bu AI Box'a ait olması doğrulanıyor.
+- İlk doğrulama Node.js tip tanımları eksik olduğu için tamamlanamadı; kök
+  `@types/node` bağımlılığı eklenerek yeniden doğrulanacak.
+
+[2026-10-28 14:31:00 +03:00]
+- NestJS API bağımlılıkları kuruldu.
+- API TypeScript kontrolü ve derlemesi başarıyla tamamlandı.
+- Geçici API smoke test sunucusu başlatıldı ve `/edge/ai-boxes` POST/GET
+  endpoint'leri gerçek isteklerle doğrulandı.
+- API adımı kapsamında henüz kalıcı veritabanı eklenmedi; kayıtlar geçici
+  bellekte tutuluyor ve sonraki PostgreSQL adımında kalıcı hale getirilecek.
+
+[2026-10-28 14:29:05 +03:00]
+- Üçüncü adım başlatıldı: tek AI Box üzerinde iki kamera çalıştıracak Python
+  agent temeli oluşturuluyor.
+- USB ve RTSP için OpenCV tabanlı kamera kaynak sınırı eklendi.
+- InferenceEngine adapter'ı eklendi; gerçek model seçilene kadar model
+  yapılandırılmamış durumda açık hata veriyor.
+- API client ile heartbeat ve anonim metrik gönderimi eklendi.
+- Agent'ın iki kamerayı da işlemesini ve iki kamera invariant'ını doğrulayan
+  testler eklendi.
+
+7. Geçerli başlangıç durumu
+---------------------------
+- Tek AI Box ve tam iki kamera sözleşme seviyesinde zorunlu.
+- Merkezi API, player ve edge agent henüz üretim sunucusu değildir; temel
+  domain/protokol iskeletidir.
+- Sonraki teknik iş: gerçek NestJS HTTP katmanı, PostgreSQL persistence,
+  kamera adapter'ları ve model runtime'ı.
+
+5. Yapılacaklar
+---------------
+- [ ] Monorepo paket ve uygulama yapılandırmalarını tamamlamak
+- [x] Ortak cihaz, kamera, metrik ve ekran sözleşmelerini tamamlamak
+- [x] NestJS API temelini ve metric ingest endpoint'ini eklemek
+- [x] Tek AI Box kaydı ve iki kamera konfigürasyonunu eklemek
+- [x] USB/RTSP kamera kaynaklarını eklemek
+- [ ] İnsan sayma inference adapter'ını eklemek
+- [ ] Mood ve demografik analiz adapter'larını güven eşiği ile eklemek
+- [x] Ekran player ve offline playlist cache mekanizmasını eklemek
+- [x] İçerik, playlist, zamanlama ve acil yayın modüllerini eklemek
+- [x] Yönetim panelini eklemek
+- [x] PostgreSQL şemasını ve migration'ları eklemek
+- [ ] Cihaz heartbeat, model sürümü ve uzaktan güncelleme akışını eklemek
+- [ ] Anonimlik, eşik, rol ve veri saklama politikalarını uygulamak
+- [ ] Yerel AI Box asistanı için model/runtime adapter'ını eklemek
+- [ ] Test, Docker, gözlemlenebilirlik ve kurulum dokümantasyonunu tamamlamak
+
+6. Gelecek karar notları
+------------------------
+- AI Box donanımı netleşince ONNX Runtime/TensorRT/CPU backend seçimi yapılacak.
+- Görüntü saklama açılırsa kısa süre, yetki ve audit log zorunlu tutulacak.
+- Küçük örneklemlerde hassas toplu istatistikler ekranda gösterilmeyecek.
+- Model doğrulukları ve unknown sınıfı metrikleri görünür tutulacak.
+
+[2026-10-28 14:51:57 +03:00]
+- Donanım bilgisi güncellendi: AI Box NVIDIA DGX Spark.
+- DGX Spark hardware profile eklendi ve iki kamera zorunluluğu korunuyor.
+- Varsayılan GPU backend TensorRT olarak tanımlandı; CPU backend'i DGX Spark
+  profili için reddediliyor.
+- TensorRT inference adapter sınırı eklendi; model engine yolu veya TensorRT
+  kurulumu eksikse açık hata veriyor, sahte metrik üretmiyor.
+- Model registry dokümantasyonu DGX Spark, CUDA/TensorRT uyumluluğu ve
+  throughput ölçümlerini zorunlu kılacak şekilde güncellendi.
+- AI Box testleri toplam 4 test ile başarıyla tamamlandı.
+- API, scheduler ve admin panel TypeScript kontrolleri başarıyla tamamlandı.
+- DGX Spark üzerinde gerçek TensorRT çalıştırması bu makinede donanım/runtime
+  bulunmadığı için yapılmadı; adapter bilinçli olarak model sözleşmesi
+  onaylanmadan `NotImplementedError` verir.
+
+[2026-10-28 14:53:00 +03:00]
+- On altıncı adım başlatıldı: DGX Spark model çıktısı için anonim metrik
+  sözleşmesi eklendi.
+- Detection listesi kişi sayısı, güven eşikli demografi/mood ve unknown
+  dağılımlarına dönüştürülüyor.
+- Ham frame saklanmıyor veya dışarı aktarılmıyor.
+- Tracker sözleşmesi hazır olmadan giriş/çıkış sayısı uydurulmuyor ve `0`
+  olarak kalıyor.
+- TensorRT çıktı decoder'ına bağlanacak `DetectionInferenceAdapter` eklendi.
+- AI Box testleri toplam 7 test ile başarıyla tamamlandı.
+- API, scheduler ve display player core TypeScript kontrolleri başarıyla
+  tamamlandı.
+- Gerçek TensorRT engine ve DGX Spark üzerinde end-to-end inference testi,
+  model dosyası/runtime kurulumu bu bilgisayarda olmadığı için beklemede.
+
+[2026-10-28 14:54:04 +03:00]
+- On yedinci adım başlatıldı: iki kamera için kişi takip ve çizgi geçiş
+  sayacı eklendi.
+- `track_id` ve merkez koordinatlarıyla bir kişinin çizgiyi yalnızca bir kez
+  geçmesi `entry` veya `exit` olarak sayılıyor.
+- Büyük koordinat sıçramaları ve geçersiz tracker ayarları reddediliyor.
+- Tracker state yalnızca AI Box belleğinde tutuluyor; merkezi API'ye yalnızca
+  toplu giriş/çıkış sayıları gönderilecek.
+- MetricsAggregator artık tracker'dan gelen giriş/çıkış sayılarını kabul ediyor.
+- DetectionInferenceAdapter artık sanal geçiş çizgisinin `line_y` değerini
+  zorunlu alıyor; yapılandırılmamış varsayılan çizgi kullanılmıyor.
+
+[2026-10-28 14:55:53 +03:00]
+- On sekizinci adım başlatıldı: model ham çıktısını ortak detection
+  sözleşmesine dönüştüren decoder eklendi.
+- Bounding box, confidence, sınıf eşleme ve track ID doğrulamaları eklendi.
+- Decoder kişi merkezlerini tracker'a, sınıf/confidence değerlerini metrik
+  aggregator'a aktarıyor.
+- `DetectionInferenceAdapter.analyze_model_output` ile ham model çıktısından
+  anonim metrik üretim yolu tamamlandı.
+- AI Box testleri toplam 12 test ile başarıyla tamamlandı.
+- Gerçek TensorRT engine çağrısı hâlâ donanım/model teslimine bağlı; decoder
+  contract'i fake/model-independent testlerle doğrulandı.
+- Agent processing loop eklendi: her kamera için ayrı inference instance'ı
+  oluşturuluyor, her döngüde iki frame işlenip iki anonim MetricsEvent
+  gönderiliyor.
+- Tracker state'in iki kamera arasında karışmaması için inference nesneleri
+  kamera bazında ayrıştırıldı.
+- `run_forever` pozitif interval doğrulaması ve stop event desteğiyle kontrollü
+  kapatılabilir hale getirildi.
+
+[2026-10-28 14:29:05 +03:00]
+- AI Box agent testleri Python 3.13 üzerinde başarıyla çalıştırıldı: 2 test
+  geçti.
+- Agent'ın gerçek kamera/model çalıştırması için OpenCV ve seçilecek inference
+  runtime'ı ayrıca kurulmalıdır; yapılandırılmamış model bilinçli olarak sessiz
+  veri üretmez ve açık hata verir.
+
+[2026-10-28 14:30:16 +03:00]
+- Dördüncü adım başlatıldı: display player yayın çekirdeği oluşturuldu.
+- Display kayıtları için benzersiz ID ve tekrar kayıt koruması eklendi.
+- Playlist cache kalıcı storage adapter üzerinden çalışacak şekilde ayrıştırıldı.
+- İnternet kesintisi senaryosu için son geçerli snapshot'ın yeniden yüklenmesi
+  doğrulandı.
+- İçerikler önceliğe göre sıralanıyor; emergency türü içerikler ayrıca
+  filtrelenebiliyor.
+- Geçersiz veya sıfır süreli içeriklerin cache'e yazılması engellendi.
+- Display player derlemesi ve davranış testleri başarıyla tamamlandı:
+  `display-player tests passed`.
+- Ekran player adımı tamamlandı; gerçek browser arayüzü ve server playlist
+  endpoint'i sonraki yönetim paneli/yayın adımlarında bağlanacak.
+
+[2026-10-28 14:30:46 +03:00]
+- Beşinci adım başlatıldı: içerik yayınlama ve zamanlama çekirdeği eklendi.
+- İçeriklerin başlangıç/bitiş tarihleri, ekran eşleşmesi ve UTC haftanın günü
+  filtresiyle aktiflik kontrolü eklendi.
+- Aktif içeriklerden ekran bazlı PlaylistSnapshot üretimi eklendi.
+- Emergency içerikler aktif olduğunda normal yayın akışını bastırıyor.
+- Aynı öncelikteki içerikler deterministik ID sırasıyla seçiliyor.
+- İlk doğrulama workspace linki yeni scheduler paketi eklenmeden önce
+  oluşturulduğu için başarısız oldu; `pnpm install` sonrası scheduler build ve
+  test başarıyla tamamlandı: `scheduler tests passed`.
+- Yayın zamanlama adımı tamamlandı; kalıcı içerik yönetimi ve API entegrasyonu
+  sonraki adımlara bırakıldı.
+
+[2026-10-28 14:31:32 +03:00]
+- Altıncı adım başlatıldı: PostgreSQL geliştirme ortamı ve ilk migration
+  şeması eklendi.
+- AI Box, iki kamera, anonim metrik, ekran, içerik ve zamanlama tabloları
+  tanımlandı.
+- AI Box kamera ilişkisinin ve retention politikasının veritabanı kısıtları
+  tasarlandı.
+- PostgreSQL Docker Compose ve örnek ortam değişkenleri eklendi.
+- Bu adımda API bellekte çalışmaya devam ediyor; kalıcı repository bağlantısı
+  sonraki adımda yapılacak.
+- AI Box başına en fazla iki kamera kısıtı PostgreSQL trigger'ı ile eklendi.
+- Docker bu geliştirme ortamında kurulu olmadığı için compose ayağa kaldırma
+  testi yapılamadı; dosya ve SQL içerikleri yerel olarak doğrulandı.
+- PostgreSQL persistence adımı şema seviyesinde tamamlandı; API repository
+  geçişi ayrı ve sonraki adım olarak tutuldu.
+
+[2026-10-28 14:32:45 +03:00]
+- Yedinci adım başlatıldı: API edge kayıtları repository arayüzüne ayrıldı.
+- PostgreSQL repository ile AI Box, kamera, heartbeat ve anonim metrik
+  kalıcılığı eklendi.
+- Bellek repository yalnızca `EDGE_REPOSITORY=memory` açıkça verilirse
+  kullanılacak; varsayılan çalışma için `DATABASE_URL` zorunlu.
+- PostgreSQL bağlantısı yokken sessiz bellek fallback'i yapılmayacak.
+- `pg` ve `@types/pg` bağımlılıkları eklendi.
+- API persistence TypeScript kontrolü ve derlemesi başarıyla tamamlandı.
+- `EDGE_REPOSITORY=memory` açıkça verilerek geçici smoke test yapıldı; kayıt ve
+  listeleme endpoint'leri repository üzerinden çalıştı.
+- PostgreSQL container'ı bu ortamda olmadığı için gerçek bağlantı testi
+  yapılamadı; `DATABASE_URL` yoksa API'nin açık hata vermesi doğrulandı.
+- API persistence adımı tamamlandı; PostgreSQL bağlantısı ve migration
+  çalıştırma operasyonu Docker kurulumundan sonra yapılacak.
+
+[2026-10-28 14:34:52 +03:00]
+- Sekizinci adım başlatıldı: Next.js yönetim panelinin ilk dashboard dilimi
+  oluşturuldu.
+- İki ekran, tek AI Box ve iki kamera için durum kartları eklendi.
+- Panel API'den AI Box listesini okuyor; API erişilemezse bağlantı durumunu
+  açıkça gösteriyor ve sahte cihaz başarısı üretmiyor.
+- Responsive temel görsel yapı ve sonraki içerik/yayın modülü için roadmap
+  bölümü eklendi.
+- Admin panel TypeScript kontrolü doğrudan compiler ile başarıyla tamamlandı.
+- Next.js production build başarıyla tamamlandı; `/` statik route olarak
+  üretildi.
+- pnpm TypeScript launcher'ının Unicode çalışma yolu problemi bu adımda da
+  gözlendi; uygulama kaynaklarında type veya build hatası bulunmadı.
+
+[2026-10-28 14:37:50 +03:00]
+- Dokuzuncu adım başlatıldı: içerik yönetiminin ilk dikey dilimi eklendi.
+- API'de duyuru, okul bilgisi, metrik ve acil duyuru içerikleri için listeleme,
+  oluşturma ve silme endpoint'leri eklendi.
+- Acil duyurular için minimum 100 öncelik doğrulaması eklendi.
+- Yönetim paneline içerik ekleme formu, içerik listesi ve silme işlemi eklendi.
+- API bağlantısı yoksa içerik ve cihaz verileri sahte başarı göstermeden
+  bağlantı yok durumunda kalıyor.
+- API typecheck ve içerik endpoint smoke testi başarıyla tamamlandı.
+- Admin panel typecheck ve Next.js production build başarıyla tamamlandı.
+- Bu adımda içerikler API belleğinde tutuluyor; PostgreSQL `contents`
+  persistence bağlantısı sonraki migration/repository adımında tamamlanacak.
+
+[2026-10-28 14:41:08 +03:00]
+- Onuncu adım başlatıldı: içerik yönetimi PostgreSQL repository katmanına
+  ayrıldı.
+- İçerik listeleme, oluşturma ve silme işlemleri artık repository üzerinden
+  çalışıyor.
+- PostgreSQL yokken sessiz bellek fallback'i yapılmıyor; bellek repository'si
+  yalnızca `EDGE_REPOSITORY=memory` ile seçilebiliyor.
+- Admin panelinin API'ye tarayıcıdan erişebilmesi için kontrollü CORS origin
+  ayarı eklendi.
+
+[2026-10-28 14:42:14 +03:00]
+- On birinci adım başlatıldı: ekran bazlı playlist snapshot API'si eklendi.
+- `GET /playlists/:displayId` endpoint'i scheduler servisiyle bağlandı.
+- Yönetim paneline ekran seçimi ve playlist önizlemesi eklendi.
+- Bilinçli geçici sınır: içerik zamanlama tabloları henüz repository'ye
+  bağlanmadığı için mevcut içerikler iki tanımlı ekranda aktif varsayılıyor;
+  gerçek tarih/ekran ataması PostgreSQL schedule repository adımında
+  uygulanacak.
+- İlk doğrulamada bilinmeyen ekran hatası HTTP 500 olarak görüldü; endpoint
+  açıkça `NotFoundException` kullanacak şekilde düzeltildi.
+- Scheduler workspace paketi API'ye doğru export üzerinden bağlandı.
+- API derleme ve playlist smoke testi başarıyla tamamlandı; bilinmeyen ekran
+  artık HTTP 404 döndürüyor.
+- Admin panel production build'i playlist önizlemesi ile başarıyla tamamlandı.
+- Playlist endpoint'i ve panel önizlemesi tamamlandı; gerçek schedule
+  persistence bağlantısı sonraki adımda ele alınacak.
+
+[2026-10-28 14:43:51 +03:00]
+- On ikinci adım başlatıldı: gerçek içerik zamanlama ve ekran ataması API'ye
+  bağlandı.
+- İçerik oluşturma isteği artık ekran listesi, başlangıç/bitiş zamanı ve
+  haftanın günlerini taşıyor.
+- PostgreSQL repository `content_schedules` ve `content_displays` tablolarına
+  transaction içinde kayıt yazıyor ve playlist sorgusunda bunları okuyor.
+- Playlist scheduler artık geçici 2020-2099 varsayımı yerine gerçek schedule
+  verisini kullanıyor.
+- Yönetim panelinden oluşturulan ilk içerik iki tanımlı ekrana atanıyor ve
+  başlangıç zamanı oluşturma anı olarak yazılıyor.
+- İlk typecheck sırasında bellek repository kopyasında `schedule` alanının
+  kaybolduğu görüldü; repository tipi ScheduledContent olacak şekilde düzeltildi.
+- API derleme ve gerçek ekran filtreleme smoke testi başarıyla tamamlandı:
+  içerik display-01'de göründü, display-02'de görünmedi.
+- Geçici iki ekran varsayımı kaldırıldı; playlist artık gerçek schedule ve
+  display atamasından üretiliyor.
+
+[2026-10-28 14:45:27 +03:00]
+- On üçüncü adım başlatıldı: yönetim panelindeki içerik formuna gerçek yayın
+  planlama alanları eklendi.
+- Başlangıç ve bitiş zamanı tarayıcı yerel saatinden UTC ISO formatına
+  dönüştürülerek API'ye gönderiliyor.
+- Ekran seçimi zorunlu hale getirildi; iki ekran ayrı ayrı seçilebiliyor.
+- Haftanın günleri seçilebiliyor; boş bırakılırsa her gün yayınlanıyor.
+- Geçersiz zaman aralığı ve ekransız içerik gönderimi form seviyesinde
+  engelleniyor.
+- Admin panel typecheck ve production build başarıyla tamamlandı.
+- Scheduler ve API typecheck başarıyla tamamlandı.
+- Formun API'ye gönderdiği schedule nesnesi gerçek ekran ve zaman atamasını
+  taşıyor; playlist filtrelemesi önceki smoke testte doğrulanmış davranışı
+  kullanıyor.
+
+[2026-10-28 14:48:08 +03:00]
+- On dördüncü adım başlatıldı: içerik yaşam döngüsüne düzenleme desteği eklendi.
+- API'de içerik güncelleme endpoint'i ve repository operasyonu eklendi.
+- PostgreSQL güncellemesi içerik, zamanlama ve ekran ilişkilerini tek
+  transaction içinde yeniliyor.
+- Yönetim panelinde içeriklerin hedef ekran, başlangıç/bitiş zamanı ve gün
+  bilgileri düzenleme formuna yüklenebiliyor.
+- İçerik listesinde hedef ekran ve yerel saat formatında yayın aralığı
+  görünür hale getirildi.
+- Güncelleme endpoint'i `PUT /content/:id` olarak netleştirildi.
+- İlk güncelleme smoke testinde Türkçe başlık karşılaştırması PowerShell
+  kodlaması nedeniyle metin eşleşmedi; playlist çıktısı ayrıca incelendi ve
+  içerik display-01'den kaldırılıp display-02'ye taşındığı doğrulandı.
+- API ve admin panel typecheck başarıyla tamamlandı.
+- İçerik listesinde hedef ekran ve yerel yayın aralığı görünürlüğü eklendi.
+
+[2026-10-28 14:49:26 +03:00]
+- On beşinci adım başlatıldı: display player gerçek browser uygulamasına
+  dönüştürülüyor.
+- Display player Next.js App Router ile playlist endpoint'ine bağlandı.
+- İçerikler sürelerine göre sırayla oynatılıyor ve emergency görsel durumu
+  ayrı stil ile gösteriliyor.
+- API erişilemezse son başarılı playlist tarayıcı cache'inden kullanılacak;
+  cache yoksa ekran aktif içerik olmadığını açıkça gösteriyor.
+- Ekran ID'si `?display=display-01` veya `?display=display-02` ile seçiliyor.
+- Offline cache gerçek `localStorage` adapter'ına taşındı; sayfa yenilense bile
+  son başarılı playlist korunuyor.
+- Core TypeScript test build'i ile Next.js browser build'i ayrıştırıldı.
+- Display player typecheck, core test ve Next.js production build başarıyla
+  tamamlandı.
+- Build sırasında localStorage erişimi server render'da oluşmasın diye browser
+  adapter'ı SSR güvenli hale getirildi.
+- Display player adımı tamamlandı; sıradaki iş cihaz sağlık ve heartbeat
+  ekranını gerçek zamanlı hale getirmek.
+- Repository geçişi sonrası bellek modunda öncelik sırasının korunması için
+  listeleme sıralaması yeniden uygulandı.
+- API typecheck ve memory repository ile içerik oluşturma/listeleme smoke testi
+  başarıyla tamamlandı; acil içerik yüksek öncelikle listelendi.
+- PostgreSQL gerçek bağlantısı Docker bulunmadığı için ayrıca test edilemedi.
+
+[2026-10-28 14:57:02 +03:00]
+- On dokuzuncu adım tamamlandı: iki kamera için kontrollü frame processing
+  loop eklendi.
+- Her kamera ayrı inference instance'ı kullanıyor; tracker state kameralar
+  arasında paylaşılmıyor.
+- `run_forever` interval ve stop event desteğiyle uzun süreli agent çalışmasını
+  kontrollü hale getiriyor.
+- AI Box testleri 14 test ile, Python kaynak derlemesi ise başarıyla tamamlandı.
+- Gerçek TensorRT model çalıştırması ve kamera cihazı entegrasyonu sonraki
+  donanım doğrulama adımına bırakıldı.
+
+[2026-10-28 15:00:50 +03:00]
+- Kamera ve DGX Spark olmadan yerel arayüz testi başlatıldı.
+- API, PostgreSQL yerine açıkça `EDGE_REPOSITORY=memory` ile çalıştırıldı.
+- Admin paneli `http://localhost:3001`, display player `http://localhost:3002`
+  üzerinde çalışıyor.
+- API `http://localhost:3000/content` endpoint'i ve iki arayüz HTTP 200 ile
+  doğrulandı.
+- Bu yerel test modunda kamera agent'i çalıştırılmıyor; API belleği işlem
+  kapandığında temizlenir.
+
+[2026-10-28 15:05:52 +03:00]
+- Display'in duyuruları alamamasının nedeni tespit edildi: API CORS yalnızca
+  admin panel origin'ine izin veriyor, display-player origin'i engelleniyordu.
+- CORS artık admin paneli ve display-player origin'lerini destekliyor.
+- Display ID'nin server/client farklı oluşmasından kaynaklanan hydration
+  problemi giderildi.
+- İçerik formuna metin, görsel URL, video/HLS URL ve süre alanları eklendi.
+- Display player görsel ve video içeriklerini gösterecek şekilde güncellendi.
+- Wowza için HLS `.m3u8` URL'si video içerik kaynağı olarak destekleniyor.
+- İçerik güncelleme sonrasında panel listesinin aynı kaydı çoğaltması düzeltildi.
+
+[2026-10-28]
+- Admin paneli tek sayfalı prototipten bölümlü Türkçe yönetim arayüzüne dönüştürüldü.
+- Ekran kayıtları API/veritabanı üzerinden listelenip eklenebilir ve kaldırılabilir hale getirildi; sabit ekran listesi kaldırıldı.
+- Admin oturumu, origin kontrolü ve AI Box API anahtarı koruması eklendi.
+- Duyuru ekleri için PDF/görsel/video ve DOCX/PPTX yükleme sınırı eklendi; Office dönüştürme ayrı, yerel Docker servisine alındı.
+- Player dinamik ekran kimliklerini ve imzalı, aktif yayınla sınırlı medya bağlantılarını destekliyor.
+- `pnpm dev:up` geliştirme betiği Postgres, belge dönüştürücü, API, admin ve player süreçlerini başlatacak şekilde eklendi.
+- API derlemesi, admin/player typecheck ve Next production build kontrolleri geçti. Tam servis ayağa kaldırma, Docker Desktop bu makinede bulunmadığı için çalıştırılamadı.
+- Gerçek TensorRT modeli ve DGX Spark agent çalışması bu geliştirme bilgisayarında halen mümkün değil.
+
+[2026-10-28 15:55 +03:00]
+- Docker bulunmayan Windows ortamı için otomatik in-memory çalışma kipi eklendi; iki örnek ekranla panel/API/player açılıyor.
+- pnpm’in Unicode repo yolunda hatalı oluşturduğu workspace junction’ları `dev.ps1` içinde düzeltiliyor; TypeScript doğrudan Node girişinden çağrılıyor.
+- Portlar doluysa başka boş port seçiliyor; Next dev süreçleri oturuma özel `.next-dev-*` klasörlerini kullanıyor ve loglar `var/logs` altında tutuluyor.
+- `pnpm dev:up` bu makinede başarılı çalıştırıldı; API, admin ve player HTTP 200 döndürdü (3003, 3004, 3005).
+- Docker bulunmadığı için bu kipte veriler API kapanınca sıfırlanır; DOCX/PPTX dönüştürücü kapalıdır. PDF/görsel/video yükleme yerel kipte kullanılabilir.
