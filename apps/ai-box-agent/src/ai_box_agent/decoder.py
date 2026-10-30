@@ -37,7 +37,7 @@ class ModelOutputDecoder:
             if class_name is None:
                 continue
             self._validate(item)
-            detections.append(Detection(self._normalise_class(class_name), item.confidence))
+            detections.append(Detection(self._normalise_class(class_name), item.confidence, item.track_id))
             if class_name == "person" and item.track_id is not None:
                 x1, y1, x2, y2 = item.box
                 tracked_people.append(
