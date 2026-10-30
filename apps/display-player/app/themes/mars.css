@@ -1,0 +1,48 @@
+/* Mars: pas rengi bir gökyüzünde kum ve kor tonları.
+   Metin katmanı koyu ve durağandır; okunabilirliği bozmadan gösteriş arkadaki galaksidedir. */
+:root[data-palette='mars'] {
+  color-scheme: dark;
+  --font-family: var(--font-ui);
+  --font-heading: var(--font-ui);
+  --galaxy-warm: #ff8a4c #d9622b #8f3a17 #ffd2b3;
+  --galaxy-cool: #e8b27a #c98a52 #7a5230 #fbe6cf;
+
+  --canvas: #0b0706;
+  --canvas-bg: transparent;
+  --panel: rgba(20, 13, 11, .84);
+  --panel-2: linear-gradient(120deg, rgba(217, 98, 43, .3), rgba(232, 178, 122, .16));
+  --panel-blur: 10px;
+  --line: rgba(230, 162, 124, .2);
+  --text: #f6eee7;
+  --text-2: #dccfc4;
+  --text-3: #b3a194;
+  --glow: #f2bd9d;
+  --bar-bg: linear-gradient(100deg, rgba(20, 13, 11, .9), rgba(56, 28, 16, .78));
+  --on-bar-soft: #f6eee7;
+  --stage-bg: linear-gradient(125deg, rgba(20, 13, 11, .76), rgba(20, 13, 11, .56) 60%, rgba(20, 13, 11, .38));
+  --stage-glow: inset 0 0 0 1px rgba(230, 162, 124, .22), 0 0 80px rgba(217, 98, 43, .13);
+  --progress-bg: linear-gradient(90deg, #d9622b, #fbe6cf, #d9622b, #fbe6cf);
+  --flow-motion: gradient-flow 9s linear infinite;
+  --slide-enter: warp .5s cubic-bezier(.16, .8, .24, 1);
+  --title-bg: linear-gradient(100deg, #fbe6cf, #f2bd9d 60%, #ff9a63);
+  --title-motion: none;
+  --title-filter: none;
+  --wordmark-bg: linear-gradient(#f2bd9d, #f2bd9d);
+  --chip-bg: rgba(230, 162, 124, .15);
+  --media-bg: #0b0706;
+  --media-fade: rgba(11, 7, 6, .94);
+  --veil: rgba(20, 13, 11, .92);
+  --offline-bg: #b3261e;
+  --offline-fg: #fff;
+  --alert-canvas: #7a120c;
+  --alert-1: #c62f26;
+  --alert-2: #8f1a13;
+  --alert-ring: #fff;
+  --alert-ring-dim: rgba(255, 255, 255, .25);
+  --alert-bar: #7a120c;
+  --alert-bar-fg: #ffe3e0;
+  --alert-fg: #fff;
+  --alert-soft: #ffe3e0;
+  --alert-chip-bg: #fff;
+  --alert-chip-fg: #a31f18;
+}

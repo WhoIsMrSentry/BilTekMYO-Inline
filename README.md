@@ -26,6 +26,14 @@ Docker’sız kipte ekranlar ve içerikler bellek verisidir; API’yi kapatmak b
 
 İlk yerel giriş: `admin` / `change-this-local-password`. Gerçek ortamda `.env` içindeki kullanıcı adı, parola, oturum sırrı ve AI Box anahtarını mutlaka değiştirin. Durdurmak için açılan servis pencerelerini kapatın; PostgreSQL’i durdurmak için `docker compose -f infrastructure/docker/docker-compose.yml stop` çalıştırın.
 
+## Temalar
+
+Tema listesi tek yerdedir: `packages/theme/src/registry.ts`. Panelin üst menüsündeki renk noktaları veya `Ctrl+K` yalnızca o tarayıcıdaki panelin temasını değiştirir.
+
+Ekranlar varsayılan olarak 30 dakikada bir sıradaki temaya geçer. Döngü saate bağlıdır, tüm ekranlar aynı anda değişir. Panelde **Ekranlar > Ekran teması** seçimi tüm ekranlara anında uygulanır, `Otomatik` döngüyü geri açar; seçim `var/display-theme.json` dosyasında saklanır. Tek bir ekranı sabitlemek için bağlantısına `&theme=<id>` ekleyin. Ekranın köşesindeki seçici geçici değişiklik yapar, sıradaki tema gelince döngü devam eder.
+
+Yeni tema eklemek için listeye bir kayıt ekleyin, her iki uygulamada `app/themes/<id>.css` oluşturup `app/themes/index.css` içine aktarın.
+
 ## İçerik ekleri
 
 PDF, PNG/JPEG/WebP, MP4 ve DOCX/PPTX yüklenebilir. Office belgeleri yerel converter container’ında PDF’e dönüştürülür; dönüştürücü internetten belge almaz ve yalnızca loopback üzerinde yayınlanır. Yükleme sınırı 40 MB’dir. Dosyalar uygulamanın `var/uploads` klasöründe saklanır. Admin erişimi oturumla korunur; player bağlantıları imzalıdır ve yalnızca ilgili ekranda o sırada yayınlanan içeriğe izin verir.

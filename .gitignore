@@ -22,3 +22,4 @@ var/uploads/
 var/logs/
 **/.next-dev-*/
 models/**/*.pth
+var/display-theme.json

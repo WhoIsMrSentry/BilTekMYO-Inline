@@ -1,0 +1,95 @@
+/* Galaksi tema: uzay boşluğunda #88001b, #500213 ve avatar yeşili #38c808 tonları.
+   Işık yayan parçalarda aynı renklerin parlak halleri kullanılır, çünkü koyu bordo siyah zeminde görünmez.
+   Uzay koyu olduğu için bu temada açık mod yoktur.
+   Normal yayın zaten kırmızı ve yeşil tonlarında olduğundan acil durum sarı-siyahtır. */
+:root[data-palette='galaxy'] {
+  color-scheme: dark;
+  --galaxy-warm: #ff2d55 #d40f3f #88001b #ff8a9e;
+  --galaxy-cool: #38c808 #7dff4f #1c7a05 #b8ff9c;
+  --theme-toggle: none;
+
+  --bg: #030204;
+  --surface: #150b12;
+  --raised: #20101a;
+  --sunken: #0e070c;
+  --band: #0e070c;
+  --line: rgba(255, 255, 255, .11);
+  --line-strong: rgba(255, 255, 255, .22);
+  --text: #f5f2f4;
+  --text-2: #d3cbd0;
+  --text-3: #a79ca3;
+  --accent: #38c808;
+  --accent-strong: #ff8aa0;
+  --accent-soft: rgba(255, 45, 85, .13);
+  --on-accent: #071a02;
+  --heading: #ff8096;
+  --brand-1: #88001b;
+  --brand-2: #500213;
+  --hero: transparent;
+  --glow: #7dff4f;
+  --live: #6be93c;
+  --live-soft: rgba(56, 200, 8, .16);
+  --info: #c3b9ff;
+  --info-soft: rgba(120, 100, 255, .18);
+  --warn: #ffc56b;
+  --warn-soft: rgba(255, 179, 0, .16);
+  --danger: #ff9259;
+  --danger-strong: #c2410c;
+  --danger-soft: rgba(255, 120, 60, .16);
+  --neutral-soft: rgba(255, 255, 255, .09);
+  --shadow-sm: none;
+  --shadow-md: 0 8px 30px rgba(0, 0, 0, .35);
+  --shadow-lg: 0 24px 70px rgba(0, 0, 0, .7);
+  --radius: 12px;
+  --radius-sm: 8px;
+  --radius-xs: 6px;
+
+  --glass: rgba(8, 6, 9, .68);
+  --glass-blur: 12px;
+  --hover-line: rgba(255, 255, 255, .26);
+  --hover-glow: 0 0 30px rgba(255, 45, 85, .15), 0 0 40px rgba(56, 200, 8, .09);
+  --flow-motion: gradient-flow 7s linear infinite;
+  --float-motion: float 5s ease-in-out infinite;
+  --orbit-opacity: 1;
+  --orbit-motion: orbit-spin 3.6s linear infinite;
+  --text-halo: 0 1px 12px rgba(0, 0, 0, .95);
+  --orbit-a: #ff2d55;
+  --orbit-b: #7dff4f;
+  --title-bg: linear-gradient(100deg, #ffc2cd, #fff 25%, #c9ffb5 50%, #fff 75%, #ffc2cd);
+  --wordmark-bg: linear-gradient(100deg, #ff8096, #fff 25%, #8dff66 50%, #fff 75%, #ff8096);
+  --dots-bg: rgba(16, 8, 14, .7);
+  --nav-active: linear-gradient(90deg, #ff2d55, #7dff4f, #ff2d55, #7dff4f);
+
+  --header-bg: linear-gradient(100deg, rgba(136, 0, 27, .26), rgba(6, 4, 7, .72) 34%, rgba(6, 4, 7, .72) 68%, rgba(28, 122, 5, .2));
+  --button-bg: linear-gradient(100deg, #a80d30, #500213, #16120f, #165f05, #a80d30);
+  --button-bg-hover: linear-gradient(100deg, #d40f3f, #a8042c, #229606, #38c808, #d40f3f);
+  --on-button: #fff;
+  --band-bg: linear-gradient(100deg, rgba(136, 0, 27, .1), rgba(6, 4, 7, .55) 40%, rgba(6, 4, 7, .55) 60%, rgba(28, 122, 5, .08));
+  --heading-bg: linear-gradient(90deg, #ff8096, #fff 62%, #b6ff9c);
+  --icon-stroke: url(#icon-stroke);
+  --icon-a: #ff6f8b;
+  --icon-b: #e9fbe2;
+  --hero-glow: none;
+  --hero-pattern: none;
+  --hero-pattern-size: auto;
+  --hero-button: rgba(255, 255, 255, .1);
+  --hero-button-text: #fff;
+  --hero-button-hover: rgba(255, 255, 255, .22);
+  --hero-button-border: rgba(255, 255, 255, .5);
+  --hero-eyebrow: #e2ffd8;
+  --hero-shadow: rgba(0, 0, 0, .9);
+  --on-dark-soft: #ece6ea;
+  --screen-bg: radial-gradient(55% 80% at 12% 14%, rgba(136, 0, 27, .75), transparent 72%), radial-gradient(44% 64% at 92% 90%, rgba(28, 122, 5, .42), transparent 72%), #060407;
+  --screen-2: #08040a;
+  --screen-fade: rgba(8, 4, 10, .85);
+  --veil: rgba(8, 4, 10, .68);
+  --overlay: rgba(4, 2, 6, .62);
+  --auth-bg: linear-gradient(120deg, rgba(136, 0, 27, .12), rgba(4, 3, 5, .35) 55%, rgba(28, 122, 5, .08));
+  --alert-bg: #ffb300;
+  --alert-fg: #1a1000;
+  --alert-soft: #3d2a00;
+  --alert-1: #ffc22e;
+  --alert-2: #ffa000;
+  --alert-chip-bg: #1a1000;
+  --alert-chip-fg: #ffc22e;
+}

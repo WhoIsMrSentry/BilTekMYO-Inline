@@ -1,8 +1,9 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { PointerEvent } from 'react';
 import type { DisplayMetricsSnapshot } from '@biltekmyo/shared-types';
+import { rotationMinutes, themes } from '@biltekmyo/theme';
 import { Icon } from './icons';
 import type { IconName } from './icons';
 import { ScreenPreview } from './screen-preview';
@@ -16,11 +17,42 @@ export type StreamState = 'connecting' | 'live' | 'offline';
 function PageHeading({ eyebrow, title, lead, children }: { eyebrow: string; title: string; lead: string; children?: React.ReactNode }) {
   return <section className="page-heading"><div><p className="eyebrow">{eyebrow}</p><h1>{title}</h1><p className="lead">{lead}</p></div>{children}</section>;
 }
-function CardHeading({ title, detail, children }: { title: string; detail?: string; children?: React.ReactNode }) {
-  return <div className="card-heading"><div><h2>{title}</h2>{detail && <p>{detail}</p>}</div>{children}</div>;
+function CardHeading({ title, detail, icon, children }: { title: string; detail?: string; icon?: IconName; children?: React.ReactNode }) {
+  return <div className="card-heading"><div><h2>{icon && <Icon name={icon} size={19} />}{title}</h2>{detail && <p>{detail}</p>}</div>{children}</div>;
 }
 function StatTile({ label, value, detail, icon, onClick }: { label: string; value: string | number; detail: string; icon: IconName; onClick?: () => void }) {
   return <button className="stat-tile" disabled={!onClick} onClick={onClick} type="button"><span className="stat-top"><span>{label}</span><Icon name={icon} size={17} /></span><strong>{value}</strong><small>{detail}</small></button>;
+}
+function QuickTile({ label, value, icon, onClick }: { label: string; value: string | number; icon: IconName; onClick: () => void }) {
+  return <button className="quick-tile" onClick={onClick} type="button"><Icon name={icon} size={46} /><strong>{value}</strong><span>{label}</span></button>;
+}
+type HeroSlide = { id: string; eyebrow: string; title: string; lead?: string; item?: Content };
+function HeroCarousel({ slides, onCreate, onEdit }: { slides: HeroSlide[]; onCreate: () => void; onEdit: (item: Content) => void }) {
+  const [index, setIndex] = useState(0);
+  const count = slides.length;
+  const active = slides[index % count]!;
+  useEffect(() => {
+    if (count < 2 || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const timer = window.setTimeout(() => setIndex((value) => (value + 1) % count), 7000);
+    return () => window.clearTimeout(timer);
+  }, [count, index]);
+  return (
+    <section aria-label="Öne çıkanlar" className="hero">
+      <div className="hero-slide" key={active.id}>
+        <span className="hero-eyebrow">{active.eyebrow}</span>
+        <h1>{active.title}</h1>
+        {active.lead && <p className="hero-lead">{active.lead}</p>}
+        {active.item
+          ? <button className="button button-hero" onClick={() => onEdit(active.item!)} type="button"><Icon name="edit" size={16} />İçeriği düzenle</button>
+          : <button className="button button-hero" onClick={onCreate} type="button"><Icon name="plus" size={17} />Yeni içerik</button>}
+      </div>
+      {count > 1 && <>
+        <button aria-label="Önceki" className="hero-arrow prev" onClick={() => setIndex((value) => (value - 1 + count) % count)} type="button"><Icon name="chevronLeft" size={22} /></button>
+        <button aria-label="Sonraki" className="hero-arrow next" onClick={() => setIndex((value) => (value + 1) % count)} type="button"><Icon name="chevronRight" size={22} /></button>
+        <div className="hero-dots">{slides.map((slide, position) => <button aria-label={`${position + 1}. slayt`} className={position === index % count ? 'active' : ''} key={slide.id} onClick={() => setIndex(position)} type="button" />)}</div>
+      </>}
+    </section>
+  );
 }
 function ContentMark({ type }: { type: ContentType }) {
   return <span className={type === 'emergency' ? 'content-mark emergency-mark' : 'content-mark'}><Icon name={typeMeta[type].icon} size={17} /></span>;
@@ -57,27 +89,26 @@ export function Overview({ now, displays, contents, aiBoxes, metrics, streamStat
   const emergencies = live.filter((item) => item.type === 'emergency');
   const litDisplays = displays.filter((display) => nowPlaying(contents, display.id, now).length > 0).length;
   const cameras = metrics?.cameras ?? [];
-  const onlineBoxes = aiBoxes.filter((box) => heartbeatState(box, now).tone === 'live').length;
   const date = new Date(now);
+  const slides: HeroSlide[] = [
+    { id: 'summary', eyebrow: date.toLocaleDateString('tr-TR', { weekday: 'long', day: 'numeric', month: 'long' }), title: `${greeting(date.getHours())}, ekranlarınız hazır`, lead: `${live.length ? `${litDisplays} ekranda ${live.length} içerik yayında.` : 'Şu anda yayında içerik yok.'}${upcoming[0] ? ` Sıradaki yayın ${formatRelative(upcoming[0].schedule.startsAt, now)}.` : ''}` },
+    ...live.slice(0, 3).map((item): HeroSlide => ({ id: item.id, eyebrow: `Yayında · ${typeMeta[item.type].label}`, title: item.title, lead: item.payload.text, item })),
+  ];
   return <>
     {emergencies.map((item) => <div className="emergency-banner" key={item.id} role="alert"><Icon name="alert" /><div><strong>Acil yayın sürüyor: {item.title}</strong><small>{item.schedule.displayIds.length} ekranda diğer yayınlar durduruldu · {formatRelative(item.schedule.endsAt, now)} sona erer</small></div><button className="button button-light" onClick={() => onEnd(item)} type="button"><Icon name="stop" size={15} />Yayını bitir</button></div>)}
-    <section className="hero">
-      <div>
-        <p className="hero-date">{date.toLocaleDateString('tr-TR', { weekday: 'long', day: 'numeric', month: 'long' })}</p>
-        <h1>{greeting(date.getHours())}</h1>
-        <p className="hero-lead">{live.length ? `${litDisplays} ekranda ${live.length} içerik yayında.` : 'Şu anda yayında içerik yok.'}{upcoming[0] ? ` Sıradaki yayın ${formatRelative(upcoming[0].schedule.startsAt, now)}: ${upcoming[0].title}` : ''}</p>
-      </div>
-      <button className="button button-hero" onClick={onCreate} type="button"><Icon name="plus" size={17} />Yeni içerik</button>
+    <svg aria-hidden="true" className="icon-defs"><defs><linearGradient id="icon-stroke" x1="0" x2="1" y1="0" y2="1"><stop offset="0" style={{ stopColor: 'var(--icon-a)' }} /><stop offset="1" style={{ stopColor: 'var(--icon-b)' }} /></linearGradient></defs></svg>
+    <HeroCarousel onCreate={onCreate} onEdit={onEdit} slides={slides} />
+    <section className={loading ? 'quick-band loading' : 'quick-band'}>
+      <QuickTile icon="monitor" label="Ekranlar" onClick={() => go('displays')} value={displays.length} />
+      <QuickTile icon="play" label="Yayında" onClick={() => go('content')} value={live.length} />
+      <QuickTile icon="calendar" label="Planlı yayın" onClick={() => go('schedule')} value={upcoming.length} />
+      <QuickTile icon="cpu" label="AI Box" onClick={() => go('devices')} value={aiBoxes.length} />
+      <QuickTile icon="users" label="Anlık kişi" onClick={() => go('analytics')} value={cameras.length ? cameras.reduce((total, metric) => total + metric.peopleCount, 0) : '—'} />
     </section>
-    <section className={loading ? 'stat-grid loading' : 'stat-grid'}>
-      <StatTile detail={`${displays.filter((display) => display.enabled).length} ekran açık`} icon="monitor" label="Kayıtlı ekran" onClick={() => go('displays')} value={displays.length} />
-      <StatTile detail={`${litDisplays} ekranda dönüyor`} icon="play" label="Şu an yayında" onClick={() => go('content')} value={live.length} />
-      <StatTile detail={upcoming[0] ? `İlki ${formatDateTime(upcoming[0].schedule.startsAt)}` : 'Bekleyen yayın yok'} icon="calendar" label="Planlı yayın" onClick={() => go('schedule')} value={upcoming.length} />
-      <StatTile detail={aiBoxes.length ? `${onlineBoxes} cihaz çevrimiçi` : 'Henüz kayıtlı değil'} icon="cpu" label="AI Box" onClick={() => go('devices')} value={aiBoxes.length} />
-    </section>
+    <div className="home-body">
     <div className="overview-grid">
       <section className="card">
-        <CardHeading detail="Her ekranın şu anki yayını" title="Ekranlarda ne var?"><button className="text-button" onClick={() => go('displays')} type="button">Tümü <Icon name="arrowRight" size={14} /></button></CardHeading>
+        <CardHeading detail="Her ekranın şu anki yayını" icon="monitor" title="Ekranlarda ne var?"><button className="text-button" onClick={() => go('displays')} type="button">Tümü <Icon name="chevronRight" size={14} /></button></CardHeading>
         {displays.length ? <div className="now-list">{displays.slice(0, 4).map((display) => {
           const rotation = display.enabled ? nowPlaying(contents, display.id, now) : [];
           return <button className="now-row" key={display.id} onClick={() => onPreview(display)} type="button">
@@ -88,24 +119,33 @@ export function Overview({ now, displays, contents, aiBoxes, metrics, streamStat
         })}</div> : <Empty action="Ekran ekle" detail="Yayın yapacağınız ilk ekranı tanımlayın." icon="monitor" onAction={() => go('displays')} title="Henüz ekran eklenmemiş" />}
       </section>
       <section className="card">
-        <CardHeading detail="Sıraya göre sonraki içerikler" title="Yaklaşan yayınlar"><button className="text-button" onClick={() => go('schedule')} type="button">Plan <Icon name="arrowRight" size={14} /></button></CardHeading>
+        <CardHeading detail="Sıraya göre sonraki içerikler" icon="calendar" title="Yaklaşan yayınlar"><button className="text-button" onClick={() => go('schedule')} type="button">Tümü <Icon name="chevronRight" size={14} /></button></CardHeading>
         {upcoming.length ? <div className="row-list">{upcoming.slice(0, 5).map((item) => <button className="list-row" key={item.id} onClick={() => onEdit(item)} type="button"><ContentMark type={item.type} /><span className="list-info"><strong>{item.title}</strong><small>{formatDateTime(item.schedule.startsAt)} · {item.schedule.displayIds.length} ekran</small></span><span className="list-time">{formatRelative(item.schedule.startsAt, now)}</span></button>)}</div> : <Empty action="İçerik oluştur" detail="Yeni bir içerik planlayın, burada sıraya girsin." icon="calendar" onAction={onCreate} title="Planlı yayın yok" />}
       </section>
     </div>
     <section className="card">
-      <CardHeading detail="Görüntü işleme sonuçları anonim sayaçlardır" title="Kamera sonuçları"><LiveTag state={streamState} /></CardHeading>
+      <CardHeading detail="Görüntü işleme sonuçları anonim sayaçlardır" icon="camera" title="Kamera sonuçları"><LiveTag state={streamState} /></CardHeading>
       {cameras.length ? <CameraTable cameras={cameras} /> : <Empty detail="AI Box ilk ölçümü gönderdiğinde sonuçlar burada görünür." icon="camera" title="Model ölçümü bekleniyor" />}
     </section>
+    </div>
   </>;
 }
 
 type DisplaysViewProps = {
-  now: number; displays: Display[]; contents: Content[];
+  now: number; displays: Display[]; contents: Content[]; displayTheme: string; onDisplayTheme: (theme: string) => void;
   onAdd: () => void; onEdit: (display: Display) => void; onRemove: (display: Display) => void; onToggle: (display: Display) => void; onPreview: (display: Display) => void; onCopyLink: (display: Display) => void; onPlan: (display: Display) => void;
 };
-export function DisplaysView({ now, displays, contents, onAdd, onEdit, onRemove, onToggle, onPreview, onCopyLink, onPlan }: DisplaysViewProps) {
+export function DisplaysView({ now, displays, contents, displayTheme, onDisplayTheme, onAdd, onEdit, onRemove, onToggle, onPreview, onCopyLink, onPlan }: DisplaysViewProps) {
   return <>
     <PageHeading eyebrow="Yayın noktaları" lead="Ekranları yönetin, oynatıcı bağlantısını alın ve canlı önizleyin." title="Ekranlar"><button className="button button-primary" onClick={onAdd} type="button"><Icon name="plus" size={17} />Ekran ekle</button></PageHeading>
+    <section className="card">
+      <CardHeading detail="Tüm ekranlara anında uygulanır" icon="monitor" title="Ekran teması">
+        <select aria-label="Ekran teması" className="select" onChange={(event) => onDisplayTheme(event.target.value)} value={displayTheme}>
+          <option value="auto">Otomatik: {rotationMinutes} dakikada bir</option>
+          {themes.map((theme) => <option key={theme.id} value={theme.id}>{theme.label}</option>)}
+        </select>
+      </CardHeading>
+    </section>
     {displays.length ? <div className="display-grid">{displays.map((display) => {
       const rotation = display.enabled ? nowPlaying(contents, display.id, now) : [];
       return <article className={display.enabled ? 'display-card' : 'display-card disabled'} key={display.id}>
