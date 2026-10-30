@@ -1,0 +1,48 @@
+/* Nebula: mor ve pembe bir yıldız bulutu.
+   Metin katmanı koyu ve durağandır; okunabilirliği bozmadan gösteriş arkadaki galaksidedir. */
+:root[data-palette='nebula'] {
+  color-scheme: dark;
+  --font-family: var(--font-ui);
+  --font-heading: var(--font-ui);
+  --galaxy-warm: #b388ff #8e5cf0 #5b35a8 #e4d6ff;
+  --galaxy-cool: #ff7ac6 #d94fa4 #8f2f73 #ffd0ea;
+
+  --canvas: #07050f;
+  --canvas-bg: transparent;
+  --panel: rgba(14, 11, 24, .84);
+  --panel-2: linear-gradient(120deg, rgba(142, 92, 240, .3), rgba(217, 79, 164, .2));
+  --panel-blur: 10px;
+  --line: rgba(185, 166, 242, .2);
+  --text: #f3f0fa;
+  --text-2: #d6d0e4;
+  --text-3: #a9a2bd;
+  --glow: #cfc1f8;
+  --bar-bg: linear-gradient(100deg, rgba(14, 11, 24, .9), rgba(38, 24, 66, .78));
+  --on-bar-soft: #f3f0fa;
+  --stage-bg: linear-gradient(125deg, rgba(14, 11, 24, .76), rgba(14, 11, 24, .56) 60%, rgba(14, 11, 24, .38));
+  --stage-glow: inset 0 0 0 1px rgba(185, 166, 242, .22), 0 0 80px rgba(142, 92, 240, .14);
+  --progress-bg: linear-gradient(90deg, #8e5cf0, #ff7ac6, #8e5cf0, #ff7ac6);
+  --flow-motion: gradient-flow 9s linear infinite;
+  --slide-enter: warp .5s cubic-bezier(.16, .8, .24, 1);
+  --title-bg: linear-gradient(100deg, #f3f0fa, #cfc1f8 60%, #ffc4e6);
+  --title-motion: none;
+  --title-filter: none;
+  --wordmark-bg: linear-gradient(#cfc1f8, #cfc1f8);
+  --chip-bg: rgba(185, 166, 242, .15);
+  --media-bg: #07050f;
+  --media-fade: rgba(7, 5, 15, .94);
+  --veil: rgba(14, 11, 24, .92);
+  --offline-bg: #b3261e;
+  --offline-fg: #fff;
+  --alert-canvas: #7a120c;
+  --alert-1: #c62f26;
+  --alert-2: #8f1a13;
+  --alert-ring: #fff;
+  --alert-ring-dim: rgba(255, 255, 255, .25);
+  --alert-bar: #7a120c;
+  --alert-bar-fg: #ffe3e0;
+  --alert-fg: #fff;
+  --alert-soft: #ffe3e0;
+  --alert-chip-bg: #fff;
+  --alert-chip-fg: #a31f18;
+}

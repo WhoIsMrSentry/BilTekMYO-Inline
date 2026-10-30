@@ -34,7 +34,9 @@ $workspaceLinks = @(
   @{ Path = 'apps\api\node_modules\@biltekmyo\shared-types'; Target = 'packages\shared-types' },
   @{ Path = 'apps\api\node_modules\@biltekmyo\scheduler'; Target = 'services\scheduler' },
   @{ Path = 'apps\admin-panel\node_modules\@biltekmyo\shared-types'; Target = 'packages\shared-types' },
-  @{ Path = 'apps\display-player\node_modules\@biltekmyo\shared-types'; Target = 'packages\shared-types' }
+  @{ Path = 'apps\display-player\node_modules\@biltekmyo\shared-types'; Target = 'packages\shared-types' },
+  @{ Path = 'apps\admin-panel\node_modules\@biltekmyo\theme'; Target = 'packages\theme' },
+  @{ Path = 'apps\display-player\node_modules\@biltekmyo\theme'; Target = 'packages\theme' }
 )
 foreach ($link in $workspaceLinks) { Repair-WorkspaceJunction $link.Path $link.Target }
 
