@@ -32,6 +32,10 @@ export class ContentService {
     this.updates.emit('changed');
   }
 
+  notifyDisplays(): void {
+    this.updates.emit('changed');
+  }
+
   onChanged(listener: () => void): () => void {
     this.updates.on('changed', listener);
     return () => this.updates.off('changed', listener);

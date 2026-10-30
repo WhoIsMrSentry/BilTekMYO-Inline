@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@biltekmyo/shared-types": "workspace:*",
+    "@biltekmyo/theme": "workspace:*",
     "hls.js": "^1.7.3",
     "next": "^15.1.0",
     "react": "^19.0.0",
