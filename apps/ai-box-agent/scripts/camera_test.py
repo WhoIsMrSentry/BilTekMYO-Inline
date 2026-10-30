@@ -1,8 +1,12 @@
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 import time
+from queue import Empty, Queue
+from threading import Event, Lock, Thread
+from datetime import datetime, timezone
 from pathlib import Path
 
 import cv2
@@ -11,6 +15,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from ai_box_agent.inference import YoloXOnnxRuntimeEngine
+from ai_box_agent.client import ApiClient
 
 
 def parse_args() -> argparse.Namespace:
@@ -19,8 +24,8 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--model",
-        default=str(PROJECT_ROOT / "models" / "pretrained" / "yolox_tiny.onnx"),
-        help="ONNX model yolu (varsayılan: YOLOX-Tiny).",
+        default=str(PROJECT_ROOT / "models" / "pretrained" / "yolox_nano.onnx"),
+        help="ONNX model yolu (varsayılan: CPU için daha hafif YOLOX-Nano).",
     )
     parser.add_argument("--camera", type=int, default=0, help="Kamera aygıt numarası.")
     parser.add_argument(
@@ -30,6 +35,15 @@ def parse_args() -> argparse.Namespace:
         help="ONNX Runtime sağlayıcısı.",
     )
     parser.add_argument("--confidence", type=float, default=0.35)
+    parser.add_argument("--input-size", type=int, choices=(416,), default=416,
+                        help="Bu model dosyası 416x416 sabit giriş kullanır.")
+    parser.add_argument("--cpu-threads", type=int, default=2,
+                        help="ONNX Runtime CPU iş parçacığı sayısı.")
+    parser.add_argument("--preview-fps", type=float, default=20.0,
+                        help="Yayın ekranına gönderilecek en yüksek kare hızı (varsayılan: 20).")
+    parser.add_argument("--publish-preview", action="store_true", help="Publish the annotated preview and anonymous metrics to the assigned display.")
+    parser.add_argument("--api-url", default="http://localhost:3000")
+    parser.add_argument("--camera-id", default="camera-01")
     return parser.parse_args()
 
 
@@ -40,6 +54,8 @@ def main() -> int:
         model_version=Path(args.model).stem,
         provider=args.provider,
         confidence_threshold=args.confidence,
+        input_size=args.input_size,
+        cpu_threads=args.cpu_threads,
     )
     backend = cv2.CAP_DSHOW if sys.platform == "win32" else cv2.CAP_ANY
     camera = cv2.VideoCapture(args.camera, backend)
@@ -47,23 +63,156 @@ def main() -> int:
         raise SystemExit(
             f"Kamera {args.camera} açılamadı. Windows kamera iznini ve aygıt numarasını kontrol edin."
         )
+    camera.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+    camera.set(cv2.CAP_PROP_FRAME_HEIGHT, 360)
+    camera.set(cv2.CAP_PROP_BUFFERSIZE, 1)
 
-    print(f"Model: {Path(args.model).name} | Provider: {engine.provider_name}")
-    print("Kamera görüntüsü yalnızca bu bilgisayarda işlenir ve kaydedilmez. Çıkmak için Q veya Esc.")
+    api_client = None
+    paired_camera_id = "camera-02" if args.camera_id != "camera-02" else "camera-01"
+    if args.publish_preview:
+        api_key = os.environ.get("AI_BOX_API_KEY", "")
+        if not api_key:
+            camera.release()
+            raise SystemExit("AI_BOX_API_KEY ortam değişkeni --publish-preview için gerekli.")
+        api_client = ApiClient(args.api_url, api_key=api_key)
+        api_client.register_ai_box({"id": "ai-box-camera-test", "name": "Yerel kamera testi", "cameraIds": [args.camera_id, paired_camera_id]})
+        api_client.send_heartbeat({
+            "aiBoxId": "ai-box-camera-test", "sentAt": datetime.now(timezone.utc).isoformat(),
+            "agentVersion": "camera-test", "modelVersion": Path(args.model).stem,
+            "cameraStatuses": {args.camera_id: "online", paired_camera_id: "offline"},
+        })
+
+    state_lock = Lock()
+    capture_stop = Event()
+    inference_stop = Event()
+    publish_stop = Event()
+    metric_queue: Queue = Queue(maxsize=2)
+    preview_queue: Queue = Queue(maxsize=1)
+    latest = {"frame": None, "version": 0, "detections": [], "people_count": 0, "captured_at": ""}
+
+    def capture_latest() -> None:
+        while not capture_stop.is_set():
+            ok, captured = camera.read()
+            if not ok:
+                time.sleep(0.02)
+                continue
+            with state_lock:
+                latest["frame"] = captured
+                latest["version"] += 1
+
+    def infer_latest() -> None:
+        last_version = 0
+        motion_seen = False
+        while not inference_stop.is_set():
+            with state_lock:
+                frame = latest["frame"].copy() if latest["frame"] is not None else None
+                version = latest["version"]
+            if frame is None or version == last_version:
+                time.sleep(0.005)
+                continue
+            last_version = version
+            try:
+                motion_seen = engine.motion_detected(frame) or motion_seen
+                detections = engine.detect(frame)
+                decoded = engine.decoder.decode(detections)
+                metrics = engine.metrics.aggregate(decoded.detections)
+                captured_at = datetime.now(timezone.utc).isoformat()
+                with state_lock:
+                    latest["detections"] = detections
+                    latest["people_count"] = len(detections)
+                    latest["captured_at"] = captured_at
+                if api_client:
+                    event = {
+                        "schemaVersion": 1, "aiBoxId": "ai-box-camera-test", "cameraId": args.camera_id,
+                        "capturedAt": captured_at, "motionDetected": motion_seen, "metrics": metrics,
+                    }
+                    if metric_queue.full():
+                        try:
+                            metric_queue.get_nowait()
+                            metric_queue.task_done()
+                        except Empty:
+                            pass
+                    metric_queue.put_nowait(event)
+                motion_seen = False
+            except Exception as error:
+                print(f"Model işlemi başarısız: {error}", flush=True)
+
+    capture_thread = Thread(target=capture_latest, name="camera-capture", daemon=True)
+    inference_thread = Thread(target=infer_latest, name="camera-inference", daemon=True)
+    capture_thread.start()
+    inference_thread.start()
+
+    publisher_threads = []
+    if api_client:
+        def publish_metrics() -> None:
+            while not publish_stop.is_set() or not metric_queue.empty():
+                try:
+                    event = metric_queue.get(timeout=0.1)
+                except Empty:
+                    continue
+                try:
+                    api_client.send_metrics(event)
+                except Exception as error:
+                    print(f"Metrik gönderimi başarısız: {error}", flush=True)
+                finally:
+                    metric_queue.task_done()
+
+        def publish_previews() -> None:
+            interval = 1.0 / max(0.25, args.preview_fps)
+            while not publish_stop.is_set():
+                started_at = time.perf_counter()
+                with state_lock:
+                    frame = latest["frame"].copy() if latest["frame"] is not None else None
+                    detections = list(latest["detections"])
+                    people_count = int(latest["people_count"])
+                    captured_at = datetime.now(timezone.utc).isoformat()
+                if frame is not None:
+                    try:
+                        jpeg = engine._annotated_preview(frame, detections, people_count)
+                        if preview_queue.full():
+                            try:
+                                preview_queue.get_nowait()
+                                preview_queue.task_done()
+                            except Empty:
+                                pass
+                        preview_queue.put_nowait((captured_at, jpeg))
+                    except Exception as error:
+                        print(f"Önizleme hazırlanamadı: {error}", flush=True)
+                time.sleep(max(0, interval - (time.perf_counter() - started_at)))
+
+        def send_previews() -> None:
+            while not publish_stop.is_set() or not preview_queue.empty():
+                try:
+                    captured_at, jpeg = preview_queue.get(timeout=0.1)
+                except Empty:
+                    continue
+                try:
+                    api_client.send_camera_frame("ai-box-camera-test", args.camera_id, captured_at, jpeg)
+                except Exception as error:
+                    print(f"Önizleme gönderimi başarısız: {error}", flush=True)
+                finally:
+                    preview_queue.task_done()
+
+        publisher_threads = [
+            Thread(target=publish_metrics, name="camera-metrics-publisher", daemon=True),
+            Thread(target=publish_previews, name="camera-preview-encoder", daemon=True),
+            Thread(target=send_previews, name="camera-preview-publisher", daemon=True),
+        ]
+        for thread in publisher_threads:
+            thread.start()
+
+    print(f"Model: {Path(args.model).name} | Provider: {engine.provider_name} | Giriş: {args.input_size}px | CPU threads: {args.cpu_threads}")
+    print("Kareler diske yazılmaz. Önizleme gönderimi: " + ("açık" if api_client else "kapalı") + ". Q veya Esc ile kapatın.")
     previous = time.perf_counter()
     fps = 0.0
-    failed_reads = 0
     try:
         while True:
-            ok, frame = camera.read()
-            if not ok:
-                failed_reads += 1
-                if failed_reads < 12:
-                    time.sleep(0.1)
-                    continue
-                raise RuntimeError("Kameradan görüntü okunamadı.")
-            failed_reads = 0
-            detections = engine.detect(frame)
+            with state_lock:
+                frame = latest["frame"].copy() if latest["frame"] is not None else None
+                detections = list(latest["detections"])
+            if frame is None:
+                time.sleep(0.01)
+                continue
             for detection in detections:
                 x1, y1, x2, y2 = (int(value) for value in detection.box)
                 cv2.rectangle(frame, (x1, y1), (x2, y2), (70, 220, 170), 2)
@@ -89,7 +238,14 @@ def main() -> int:
             if key in (ord("q"), 27):
                 break
     finally:
+        inference_stop.set()
+        capture_stop.set()
+        publish_stop.set()
         camera.release()
+        capture_thread.join(timeout=2)
+        inference_thread.join(timeout=2)
+        for thread in publisher_threads:
+            thread.join(timeout=2)
         cv2.destroyAllWindows()
     return 0
 

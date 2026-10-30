@@ -67,11 +67,15 @@ function LiveTag({ state }: { state: StreamState }) {
   return <span className={`stream-tag ${state}`}><i />{state === 'live' ? 'Canlı' : state === 'offline' ? 'Bağlantı yok' : 'Bağlanıyor'}</span>;
 }
 function CameraTable({ cameras }: { cameras: DisplayMetricsSnapshot['cameras'] }) {
+  const hasGenderOutput = cameras.some((metric) => (metric.genderDistribution?.female ?? 0) + (metric.genderDistribution?.male ?? 0) > 0);
   return (
-    <div className="table-wrap"><table className="data-table">
-      <thead><tr><th>Kamera</th><th className="numeric">Kişi</th><th className="numeric">Giriş</th><th className="numeric">Çıkış</th><th className="numeric">Tahmini doluluk</th><th>Son ölçüm</th></tr></thead>
-      <tbody>{cameras.map((metric) => <tr key={`${metric.aiBoxId}:${metric.cameraId}`}><td className="strong">{metric.cameraId}</td><td className="numeric strong">{metric.peopleCount}</td><td className="numeric">{metric.entries}</td><td className="numeric">{metric.exits}</td><td className="numeric">{metric.estimatedOccupancy}</td><td>{formatClock(metric.capturedAt)}</td></tr>)}</tbody>
-    </table></div>
+    <>
+      <div className="table-wrap"><table className="data-table">
+        <thead><tr><th>Kamera</th><th className="numeric">Kişi</th><th className="numeric">Giriş</th><th className="numeric">Çıkış</th><th className="numeric">Kadın tahmini</th><th className="numeric">Erkek tahmini</th><th className="numeric">Belirsiz</th><th>Hareket</th><th>Son ölçüm</th></tr></thead>
+        <tbody>{cameras.map((metric) => <tr key={`${metric.aiBoxId}:${metric.cameraId}`}><td className="strong">{metric.cameraId}</td><td className="numeric strong">{metric.peopleCount}</td><td className="numeric">{metric.entries}</td><td className="numeric">{metric.exits}</td><td className="numeric">{metric.genderDistribution?.female ?? '—'}</td><td className="numeric">{metric.genderDistribution?.male ?? '—'}</td><td className="numeric">{metric.genderDistribution?.unknown ?? '—'}</td><td>{metric.motionDetected ? 'Algılandı' : 'Yok'}</td><td>{formatClock(metric.capturedAt)}</td></tr>)}</tbody>
+      </table></div>
+      {cameras.length > 0 && !hasGenderOutput && <p className="field-note">Bağlı YOLOX modeli kişi algılar, cinsiyet sınıflandırmaz. Bu nedenle kişiler “belirsiz” sayılır; tahmini kadın/erkek değeri üretilmez.</p>}
+    </>
   );
 }
 

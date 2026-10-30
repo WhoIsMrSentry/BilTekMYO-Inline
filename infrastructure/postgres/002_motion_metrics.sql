@@ -1,0 +1,2 @@
+ALTER TABLE metrics_events
+    ADD COLUMN IF NOT EXISTS motion_detected BOOLEAN NOT NULL DEFAULT FALSE;

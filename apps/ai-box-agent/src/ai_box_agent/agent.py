@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from threading import Event
-from time import sleep
+from time import monotonic
 from typing import Callable
 
 from .camera import CameraSource, create_camera_source
@@ -38,15 +38,20 @@ class AiBoxAgent:
     def process_once(self) -> None:
         for camera, inference in zip(self.cameras, self.inferences, strict=True):
             frame = camera.read()
-            metrics = inference.analyze(frame)
+            motion_detected = inference.motion_detected(frame)
+            metrics, preview = inference.analyze_with_preview(frame)
+            captured_at = utc_now()
             event: MetricsEvent = {
                 "schemaVersion": 1,
                 "aiBoxId": self.config.id,
                 "cameraId": camera.config.id,
-                "capturedAt": utc_now(),
+                "capturedAt": captured_at,
+                "motionDetected": motion_detected,
                 "metrics": metrics,
             }
             self.api_client.send_metrics(event)
+            if self.config.publish_preview and preview:
+                self.api_client.send_camera_frame(self.config.id, camera.config.id, captured_at, preview)
 
     def run_forever(
         self,
@@ -56,9 +61,14 @@ class AiBoxAgent:
         if interval_seconds <= 0:
             raise ValueError("Processing interval must be greater than zero.")
         stop_event = stop_event or Event()
+        next_heartbeat = 0.0
         while not stop_event.is_set():
+            started = monotonic()
+            if started >= next_heartbeat:
+                self.heartbeat({camera.config.id: "online" for camera in self.cameras})
+                next_heartbeat = started + 30
             self.process_once()
-            stop_event.wait(interval_seconds)
+            stop_event.wait(max(0, interval_seconds - (monotonic() - started)))
 
     def close(self) -> None:
         for camera in self.cameras:
