@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "biltekmyo-ai-box-agent"
+version = "0.1.0"
+description = "Local two-camera AI Box agent for anonymous school metrics."
+requires-python = ">=3.11"
+dependencies = []
+
+[project.optional-dependencies]
+opencv = ["opencv-python>=4.10"]
+camera-cpu = ["numpy>=1.26", "onnxruntime>=1.19", "opencv-python>=4.10"]
+camera-cuda = ["numpy>=1.26", "onnxruntime-gpu>=1.19", "opencv-python>=4.10"]
+camera-directml = ["numpy>=1.26", "onnxruntime-directml>=1.19; platform_system == 'Windows'", "opencv-python>=4.10"]
+
+[project.scripts]
+biltekmyo-ai-box = "ai_box_agent.main:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
