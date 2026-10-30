@@ -3,10 +3,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import type { DisplayMetricsSnapshot } from '@biltekmyo/shared-types';
+import { applyTheme, ThemeSwitcher, themes, useActiveTheme } from '@biltekmyo/theme';
 import { CommandPalette } from './command-palette';
 import type { PaletteEntry } from './command-palette';
 import { ContentEditor } from './content-editor';
-import { BrandMark, Icon } from './icons';
+import { BrandLockup, Icon } from './icons';
 import { AnalyticsView, ContentView, DevicesView, DisplaysView, Overview, ScheduleView } from './sections';
 import type { MetricSample, StreamState } from './sections';
 import { ConfirmDialog, Modal, Toasts } from './ui';
@@ -33,7 +34,7 @@ function Login({ onSignedIn }: { onSignedIn: () => void }) {
   return (
     <main className="auth-screen">
       <section className="auth-brand">
-        <div className="brand-lockup"><BrandMark /><div><strong>BilTekMYO</strong><small>İnline yayın ağı</small></div></div>
+        <BrandLockup />
         <div className="auth-pitch">
           <h2>Okulun tüm ekranları, tek bir yerden.</h2>
           <p>Duyuruyu yazın, zamanını seçin, hedef ekranları işaretleyin. Gerisi saniyeler içinde ekrana yansır.</p>
@@ -88,6 +89,8 @@ export default function DashboardPage() {
   const [confirm, setConfirm] = useState<ConfirmRequest>();
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [toasts, setToasts] = useState<Toast[]>([]);
+  const activeTheme = useActiveTheme();
+  const [displayTheme, setDisplayTheme] = useState('auto');
   const toastId = useRef(0);
 
   const dismissToast = useCallback((id: number) => setToasts((current) => current.filter((toast) => toast.id !== id)), []);
@@ -108,14 +111,15 @@ export default function DashboardPage() {
   const refresh = useCallback(async () => {
     setLoadState('loading');
     try {
-      const [displayResponse, contentResponse, boxResponse, metricsResponse] = await Promise.all([
-        api('/displays'), api('/content'), api('/edge/ai-boxes'), api('/edge/display-metrics'),
+      const [displayResponse, contentResponse, boxResponse, metricsResponse, themeResponse] = await Promise.all([
+        api('/displays'), api('/content'), api('/edge/ai-boxes'), api('/edge/display-metrics'), api('/display-theme'),
       ]);
       const nextDisplays = await displayResponse.json() as Display[];
       setDisplays(nextDisplays);
       setContents(await contentResponse.json() as Content[]);
       setAiBoxes(await boxResponse.json() as AiBox[]);
       applyMetrics(await metricsResponse.json() as DisplayMetricsSnapshot);
+      setDisplayTheme((await themeResponse.json() as { theme: string }).theme);
       setSelectedDisplay((current) => nextDisplays.some((item) => item.id === current) ? current : nextDisplays[0]?.id ?? '');
       setLoadError(''); setLoadState('connected'); setLoaded(true); setNow(Date.now());
     } catch (error) {
@@ -193,6 +197,10 @@ export default function DashboardPage() {
     void mutate(() => api(`/displays/${encodeURIComponent(id)}`, jsonInit('PUT', { ...body, enabled: !display.enabled })), display.enabled ? 'Ekran kapatıldı.' : 'Ekran açıldı.', 'Ekran durumu değiştirilemedi.');
   }
   const playerLink = (display: Display) => `${playerUrl}/?display=${encodeURIComponent(display.id)}`;
+  const previewLink = (display: Display) => `${playerLink(display)}&theme=${activeTheme.id}`;
+  function changeDisplayTheme(theme: string) {
+    void mutate(() => api('/display-theme', jsonInit('PUT', { theme })), theme === 'auto' ? 'Ekranlar otomatik temaya geçti.' : 'Ekran teması değiştirildi.', 'Ekran teması değiştirilemedi.');
+  }
   async function copyPlayerLink(display: Display) {
     try { await navigator.clipboard.writeText(playerLink(display)); notify('Oynatıcı bağlantısı kopyalandı.'); }
     catch { notify('Bağlantı kopyalanamadı.', 'error'); }
@@ -204,52 +212,47 @@ export default function DashboardPage() {
     ...sections.map((item): PaletteEntry => ({ id: item.id, label: item.label, hint: 'Sayfa', icon: item.icon, run: () => go(item.id) })),
     ...displays.map((display): PaletteEntry => ({ id: display.id, label: display.name, hint: display.location, icon: 'monitor', run: () => setPreviewDisplay(display) })),
     ...contents.map((item): PaletteEntry => ({ id: item.id, label: item.title, hint: 'İçerik', icon: 'layers', run: () => openEditor(item) })),
+    ...themes.map((theme): PaletteEntry => ({ id: `theme-${theme.id}`, label: theme.label, hint: 'Tema', icon: 'layers', run: () => applyTheme(theme) })),
   ], [contents, displays, go, openEditor]);
 
-  if (auth === 'checking') return <main className="auth-loading"><BrandMark size={52} /><p>Oturum kontrol ediliyor…</p></main>;
+  if (auth === 'checking') return <main className="auth-loading"><span className="orbit-loader" /><p>Oturum kontrol ediliyor…</p></main>;
   if (auth === 'signed-out') return <Login onSignedIn={() => setAuth('signed-in')} />;
 
-  const currentTitle = sections.find((item) => item.id === section)?.label;
   return (
     <main className="app-shell">
-      <aside className="sidebar">
-        <div className="brand-lockup"><BrandMark /><div><strong>BilTekMYO</strong><small>İnline yayın ağı</small></div></div>
-        <nav aria-label="Ana gezinme" className="main-nav">
+      <header className="site-header">
+        <button aria-label="Genel Bakış" className="brand-home" onClick={() => go('overview')} type="button"><BrandLockup /></button>
+        <nav aria-label="Ana gezinme" className="site-nav">
           {sections.map((item) => (
             <button aria-current={section === item.id ? 'page' : undefined} className={section === item.id ? 'nav-item active' : 'nav-item'} key={item.id} onClick={() => go(item.id)} type="button">
-              <Icon name={item.icon} /><span>{item.label}</span>
+              {item.label}
               {item.id === 'content' && liveCount > 0 && <i className="nav-count" title={`${liveCount} içerik yayında`}>{liveCount}</i>}
-              {item.id === 'devices' && aiBoxes.length > 0 && <i className="nav-count">{aiBoxes.length}</i>}
             </button>
           ))}
         </nav>
-        <div className="sidebar-bottom">
-          <div className="privacy-note"><Icon name="shield" /><div><strong>Yerel ve anonim</strong><small>Kamera görüntüleri cihazda kalır.</small></div></div>
-          <button className="profile-button" onClick={() => void signOut()} type="button"><span className="avatar">Y</span><span><strong>Yönetici</strong><small>Oturumu kapat</small></span><Icon name="logout" size={17} /></button>
+        <div className="header-actions">
+          <ThemeSwitcher triggerClassName="header-button" />
+          <button aria-label="Ara (Ctrl K)" className="header-button" onClick={() => setPaletteOpen(true)} title="Ara (Ctrl K)" type="button"><Icon name="search" size={17} /></button>
+          <button aria-label="Yenile" className="header-button header-optional" onClick={() => void refresh()} title="Yenile" type="button"><Icon name="refresh" size={17} /></button>
+          <button aria-label={theme === 'dark' ? 'Açık temaya geç' : 'Koyu temaya geç'} className="header-button theme-toggle" onClick={toggleTheme} title="Tema" type="button"><Icon name={theme === 'dark' ? 'sun' : 'moon'} size={17} /></button>
+          <button aria-label="Oturumu kapat" className="header-button" onClick={() => void signOut()} title="Oturumu kapat" type="button"><Icon name="logout" size={17} /></button>
         </div>
-      </aside>
+      </header>
       <section className="main-area">
-        <header className="topbar">
-          <div className="topbar-title"><BrandMark size={32} /><strong>{currentTitle}</strong></div>
-          <button className="search-trigger" onClick={() => setPaletteOpen(true)} type="button"><Icon name="search" size={16} /><span>Ara veya git…</span><kbd>Ctrl K</kbd></button>
-          <div className="topbar-actions">
-            <span className={`system-state ${loadState}`} title={loadError || undefined}><i />{loadState === 'connected' ? 'Sistem bağlı' : loadState === 'error' ? 'Bağlantı sorunu' : 'Bağlanıyor'}</span>
-            <button aria-label="Ara" className="icon-button only-mobile" onClick={() => setPaletteOpen(true)} type="button"><Icon name="search" size={17} /></button>
-            <button aria-label="Yenile" className="icon-button" onClick={() => void refresh()} title="Yenile" type="button"><Icon name="refresh" size={17} /></button>
-            <button aria-label={theme === 'dark' ? 'Açık temaya geç' : 'Koyu temaya geç'} className="icon-button" onClick={toggleTheme} title="Tema" type="button"><Icon name={theme === 'dark' ? 'sun' : 'moon'} size={17} /></button>
-            <button aria-label="Oturumu kapat" className="icon-button only-mobile" onClick={() => void signOut()} type="button"><Icon name="logout" size={17} /></button>
-          </div>
-        </header>
-        <div className="page-content" key={section}>
+        <div className={section === 'overview' ? 'page-content page-home' : 'page-content'} key={section}>
           {loadError && <div className="banner" role="alert"><Icon name="alert" size={18} /><div><strong>Bağlantı kurulamadı</strong><small>{loadError}</small></div><button className="button button-light" onClick={() => void refresh()} type="button">Yeniden dene</button></div>}
           {section === 'overview' && <Overview aiBoxes={aiBoxes} contents={contents} displays={displays} go={go} loading={!loaded} metrics={metricsSnapshot} now={now} onCreate={() => openEditor()} onEdit={openEditor} onEnd={endContent} onPreview={setPreviewDisplay} streamState={metricsStreamState} />}
-          {section === 'displays' && <DisplaysView contents={contents} displays={displays} now={now} onAdd={() => { setDisplayError(''); setDisplayForm({ name: '', location: '', enabled: true }); }} onCopyLink={(display) => void copyPlayerLink(display)} onEdit={(display) => { setDisplayError(''); setDisplayForm(display); }} onPlan={(display) => { setSelectedDisplay(display.id); go('schedule'); }} onPreview={setPreviewDisplay} onRemove={removeDisplay} onToggle={toggleDisplay} />}
+          {section === 'displays' && <DisplaysView contents={contents} displays={displays} displayTheme={displayTheme} now={now} onDisplayTheme={changeDisplayTheme} onAdd={() => { setDisplayError(''); setDisplayForm({ name: '', location: '', enabled: true }); }} onCopyLink={(display) => void copyPlayerLink(display)} onEdit={(display) => { setDisplayError(''); setDisplayForm(display); }} onPlan={(display) => { setSelectedDisplay(display.id); go('schedule'); }} onPreview={setPreviewDisplay} onRemove={removeDisplay} onToggle={toggleDisplay} />}
           {section === 'content' && <ContentView contents={contents} displays={displays} now={now} onCreate={() => openEditor()} onDuplicate={duplicateContent} onEdit={openEditor} onEnd={endContent} onRemove={removeContent} />}
           {section === 'schedule' && <ScheduleView contents={contents} displays={displays} now={now} onCreate={() => openEditor()} onEdit={openEditor} onSelect={setSelectedDisplay} selected={selectedDisplay} />}
           {section === 'devices' && <DevicesView aiBoxes={aiBoxes} metrics={metricsSnapshot} now={now} />}
           {section === 'analytics' && <AnalyticsView metrics={metricsSnapshot} samples={samples} streamState={metricsStreamState} />}
         </div>
       </section>
+      <footer className="site-footer">
+        <span><Icon name="shield" size={16} />Kamera görüntüleri cihazda kalır, yalnızca anonim sayaçlar işlenir.</span>
+        <span className={`system-state ${loadState}`} title={loadError || undefined}><i />{loadState === 'connected' ? 'Sistem bağlı' : loadState === 'error' ? 'Bağlantı sorunu' : 'Bağlanıyor'}</span>
+      </footer>
 
       {editor && <ContentEditor displays={displays} item={editor.item} key={editor.item?.id ?? 'new'} onClose={() => setEditor(undefined)} onSaved={async (message) => { setEditor(undefined); await refresh(); notify(message); }} />}
       {displayForm && (
@@ -264,7 +267,7 @@ export default function DashboardPage() {
       )}
       {previewDisplay && (
         <Modal description={previewDisplay.location} onClose={() => setPreviewDisplay(undefined)} title={previewDisplay.name} wide>
-          <div className="player-frame"><iframe src={playerLink(previewDisplay)} tabIndex={-1} title={`${previewDisplay.name} canlı önizleme`} /></div>
+          <div className="player-frame"><iframe src={previewLink(previewDisplay)} tabIndex={-1} title={`${previewDisplay.name} canlı önizleme`} /></div>
           <div className="modal-actions">
             <button className="button button-ghost" onClick={() => void copyPlayerLink(previewDisplay)} type="button"><Icon name="link" size={16} />Bağlantıyı kopyala</button>
             <a className="button button-primary" href={playerLink(previewDisplay)} rel="noreferrer" target="_blank">Oynatıcıyı aç</a>
