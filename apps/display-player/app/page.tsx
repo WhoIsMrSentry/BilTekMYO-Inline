@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { DisplayContent, DisplayMetricsSnapshot, PlaylistSnapshot } from '@biltekmyo/shared-types';
+import { ThemeSwitcher, useDisplayTheme } from '@biltekmyo/theme';
 import { LocalStorageSnapshotStorage, PlaylistCache, PlaybackQueue } from '../src/index';
 import { StreamVideo } from './stream-video';
 
@@ -24,9 +25,10 @@ function Clock() {
     const timer = window.setInterval(() => setNow(new Date()), 1000);
     return () => window.clearInterval(timer);
   }, []);
+  const [hours = '--', minutes = '--'] = now?.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }).split(':') ?? [];
   return (
     <div className="clock">
-      <strong>{now ? now.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }) : '--:--'}</strong>
+      <strong>{hours}<i className="clock-colon">:</i>{minutes}</strong>
       <span>{now?.toLocaleDateString('tr-TR', { weekday: 'long', day: 'numeric', month: 'long' })}</span>
     </div>
   );
@@ -85,7 +87,9 @@ export default function DisplayPage() {
   const [pointerIdle, setPointerIdle] = useState(true);
   const [wallClockMs, setWallClockMs] = useState(0);
   const [lastMotionAt, setLastMotionAt] = useState(0);
+  const [commandedTheme, setCommandedTheme] = useState<string>();
   const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000';
+  useDisplayTheme(commandedTheme);
 
   useEffect(() => {
     const requestedDisplay = new URLSearchParams(window.location.search).get('display');
@@ -159,16 +163,29 @@ export default function DisplayPage() {
     }
   }, [apiUrl, displayId]);
 
+  // An unreachable API keeps the last command, so a screen never loses its theme offline.
+  const loadDisplayTheme = useCallback(async () => {
+    try {
+      const response = await fetch(`${apiUrl}/display-theme`, { cache: 'no-store' });
+      if (!response.ok) return;
+      const { theme } = await response.json() as { theme: string };
+      setCommandedTheme(theme === 'auto' ? undefined : theme);
+    } catch {
+      // Retried with the next playlist refresh.
+    }
+  }, [apiUrl]);
+
   useEffect(() => {
     void loadPlaylist();
-    const refresh = window.setInterval(() => void loadPlaylist(), 30_000);
+    void loadDisplayTheme();
+    const refresh = window.setInterval(() => { void loadPlaylist(); void loadDisplayTheme(); }, 30_000);
     const events = new EventSource(`${apiUrl}/playlists/${encodeURIComponent(displayId)}/events`);
-    events.onmessage = () => { void loadPlaylist(); };
+    events.onmessage = () => { void loadPlaylist(); void loadDisplayTheme(); };
     return () => {
       window.clearInterval(refresh);
       events.close();
     };
-  }, [loadPlaylist]);
+  }, [loadDisplayTheme, loadPlaylist]);
 
   const loadMetrics = useCallback(async () => {
     try {
@@ -263,11 +280,7 @@ export default function DisplayPage() {
   return (
     <main className={`display ${isEmergency ? 'emergency' : ''} ${isCameraStream ? 'camera-live' : ''} ${pointerIdle ? 'pointer-idle' : ''}`}>
       <header className="display-bar">
-        <div className="display-brand">
-          <span className="brand-mark" />
-          <strong>BilTekMYO</strong>
-          <span>İnline</span>
-        </div>
+        <div className="display-brand"><div><strong>Anadolu Üniversitesi</strong><span>Bilişim Teknolojileri Meslek Yüksekokulu</span></div></div>
         <div className={`player-status ${connection}`} aria-live="polite">
           <span className="dot" />{connectionLabel}
         </div>
@@ -353,6 +366,7 @@ export default function DisplayPage() {
         )}
       </div>
 
+      <div className="display-theme"><ThemeSwitcher placement="above" /></div>
       <button className="fullscreen-toggle" type="button" onClick={() => void toggleFullscreen()} aria-label={fullscreen ? 'Tam ekrandan çık' : 'Tam ekran yap'} title={fullscreen ? 'Tam ekrandan çık' : 'Tam ekran yap'}>
         <svg aria-hidden="true" fill="none" height="18" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" width="18"><path d={fullscreen ? 'M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5' : 'M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5'} /></svg>
       </button>

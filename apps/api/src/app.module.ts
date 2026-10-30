@@ -15,9 +15,11 @@ import { AuthController } from './auth.controller.js';
 import { MediaController } from './media.controller.js';
 import { DisplayController } from './display.controller.js';
 import { DisplayService } from './display.service.js';
+import { DisplayThemeController } from './display-theme.controller.js';
+import { DisplayThemeService } from './display-theme.service.js';
 
 @Module({
-  controllers: [EdgeController, ContentController, PlaylistController, AuthController, MediaController, DisplayController],
+  controllers: [EdgeController, ContentController, PlaylistController, AuthController, MediaController, DisplayController, DisplayThemeController],
   providers: [
     {
       provide: 'EDGE_REPOSITORY',
@@ -43,6 +45,7 @@ import { DisplayService } from './display.service.js';
         ? new DisplayService()
         : new DisplayService(process.env.DATABASE_URL), },
     PlaylistService,
+    DisplayThemeService,
   ],
 })
 export class AppModule {}
