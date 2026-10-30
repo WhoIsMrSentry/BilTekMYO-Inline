@@ -7,6 +7,71 @@ import { StreamVideo } from './stream-video';
 
 type ConnectionState = 'loading' | 'live' | 'offline';
 
+const typeLabels: Record<DisplayContent['type'], string> = {
+  announcement: 'Duyuru', image: 'Görsel', video: 'Video', 'school-info': 'Okul bilgisi', metrics: 'Canlı veri', emergency: 'Acil duyuru',
+};
+
+function titleSize(title: string): string {
+  if (title.length <= 28) return 'title-xl';
+  return title.length <= 64 ? 'title-lg' : 'title-md';
+}
+
+/** Lives apart from the page so the one-second tick does not re-render the slide. */
+function Clock() {
+  const [now, setNow] = useState<Date>();
+  useEffect(() => {
+    setNow(new Date());
+    const timer = window.setInterval(() => setNow(new Date()), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
+  return (
+    <div className="clock">
+      <strong>{now ? now.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }) : '--:--'}</strong>
+      <span>{now?.toLocaleDateString('tr-TR', { weekday: 'long', day: 'numeric', month: 'long' })}</span>
+    </div>
+  );
+}
+
+function Slide({ item, apiUrl }: { item: DisplayContent; apiUrl: string }) {
+  const attachment = item.payload.attachmentUrl;
+  const attachmentSrc = attachment ? `${apiUrl}${attachment}` : '';
+  const isPdf = Boolean(attachment && /\.pdf(?:\?|$)/i.test(attachment));
+  const isImage = Boolean(attachment && /\.(png|jpe?g|webp)(?:\?|$)/i.test(attachment));
+  const isVideo = Boolean(attachment && /\.mp4(?:\?|$)/i.test(attachment));
+  const imageSrc = isImage ? attachmentSrc : item.payload.imageUrl;
+  const hasMedia = isPdf || isVideo || Boolean(imageSrc) || Boolean(item.payload.videoUrl);
+  const emergency = item.type === 'emergency';
+
+  if (!hasMedia) {
+    return (
+      <div className="slide-text">
+        <span className="slide-chip">
+          {emergency && <svg aria-hidden="true" fill="none" height="1.2em" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.200" viewBox="0 0 24 24" width="1.2em"><path d="M12 3.500 2.500 20h19L12 3.500ZM12 10v4.500M12 17.500h.01" /></svg>}
+          {typeLabels[item.type]}
+        </span>
+        <h1 className={titleSize(item.title)}>{item.title}</h1>
+        {item.payload.text && <p className="slide-body">{item.payload.text}</p>}
+      </div>
+    );
+  }
+  return (
+    <div className={isPdf ? 'slide-media slide-document' : 'slide-media'}>
+      <div className="media-stage">
+        {imageSrc && <img alt="" className="media-backdrop" src={imageSrc} />}
+        {imageSrc && <img alt={item.payload.attachmentName ?? item.title} className="media-fill" src={imageSrc} />}
+        {isVideo && <video autoPlay className="media-fill" loop muted playsInline src={attachmentSrc} />}
+        {isPdf && <iframe className="media-fill" src={attachmentSrc} title={item.payload.attachmentName ?? item.title} />}
+        {item.payload.videoUrl && <StreamVideo src={item.payload.videoUrl} title={item.title} />}
+      </div>
+      <div className="media-caption">
+        <span className="slide-chip">{typeLabels[item.type]}</span>
+        <h1 className="title-sm">{item.title}</h1>
+        {item.payload.text && <p className="slide-body">{item.payload.text}</p>}
+      </div>
+    </div>
+  );
+}
+
 export default function DisplayPage() {
   const [snapshot, setSnapshot] = useState<PlaylistSnapshot>();
   const [metricsSnapshot, setMetricsSnapshot] = useState<DisplayMetricsSnapshot>();
@@ -17,6 +82,7 @@ export default function DisplayPage() {
   const [hydrated, setHydrated] = useState(false);
   const playlistItemsKey = useRef('');
   const [fullscreen, setFullscreen] = useState(false);
+  const [pointerIdle, setPointerIdle] = useState(true);
   const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000';
 
   useEffect(() => {
@@ -31,6 +97,21 @@ export default function DisplayPage() {
     const updateFullscreen = () => setFullscreen(Boolean(document.fullscreenElement));
     document.addEventListener('fullscreenchange', updateFullscreen);
     return () => document.removeEventListener('fullscreenchange', updateFullscreen);
+  }, []);
+
+  // Kiosk screens should not show a parked cursor or the corner controls.
+  useEffect(() => {
+    let timer = 0;
+    const wake = () => {
+      setPointerIdle(false);
+      window.clearTimeout(timer);
+      timer = window.setTimeout(() => setPointerIdle(true), 3000);
+    };
+    window.addEventListener('pointermove', wake);
+    return () => {
+      window.clearTimeout(timer);
+      window.removeEventListener('pointermove', wake);
+    };
   }, []);
 
   const toggleFullscreen = async () => {
@@ -116,120 +197,112 @@ export default function DisplayPage() {
   );
   const cachedItems = hydrated ? queue.currentItems() : [];
   const orderedItems = cachedItems.length > 0 ? cachedItems : items;
-  const current = orderedItems[currentIndex % Math.max(orderedItems.length, 1)];
+  const slideIndex = currentIndex % Math.max(orderedItems.length, 1);
+  const current = orderedItems[slideIndex];
   const cameraMetrics = metricsSnapshot?.cameras ?? [];
   const latestMetric = cameraMetrics[0];
+  const isEmergency = current?.type === 'emergency';
+  const isHoldingStream = /\.m3u8(?:$|[?#])/i.test(current?.payload.videoUrl ?? '');
+  const upNext = orderedItems.length > 1
+    ? Array.from({ length: Math.min(orderedItems.length - 1, 3) }, (_, offset) => orderedItems[(slideIndex + offset + 1) % orderedItems.length]!)
+    : [];
 
+  // Keyed on the slide, not the item object: the cached list is rebuilt on every
+  // render, so depending on `current` would restart the timer on each metric update.
+  const currentId = current?.id;
+  const currentDuration = current?.durationSeconds;
   useEffect(() => {
-    if (!current) return;
-    if (/\.m3u8(?:$|[?#])/i.test(current.payload.videoUrl ?? '')) return;
+    if (!currentId || !currentDuration || isHoldingStream) return;
     const timer = window.setTimeout(
       () => setCurrentIndex((index) => (index + 1) % orderedItems.length),
-      current.durationSeconds * 1000,
+      currentDuration * 1000,
     );
     return () => window.clearTimeout(timer);
-  }, [current, orderedItems.length]);
+  }, [currentId, currentDuration, slideIndex, isHoldingStream, orderedItems.length]);
+
+  const connectionLabel = connection === 'live' ? 'Yayında' : connection === 'offline' ? 'Bağlantı yok' : 'Bağlanıyor';
 
   return (
-    <main className={`display ${current?.type === 'emergency' ? 'emergency' : ''}`}>
+    <main className={`display ${isEmergency ? 'emergency' : ''} ${pointerIdle ? 'pointer-idle' : ''}`}>
+      <header className="display-bar">
+        <div className="display-brand">
+          <span className="brand-mark" />
+          <strong>BilTekMYO</strong>
+          <span>İnline</span>
+        </div>
+        <div className={`player-status ${connection}`} aria-live="polite">
+          <span className="dot" />{connectionLabel}
+        </div>
+        <Clock />
+      </header>
+
       <div className="display-layout">
-        <section className="slide">
-        {current ? (
-          <>
-            <p className="content-type">{current.type === 'emergency' ? 'ACİL DUYURU' : current.type.toUpperCase()}</p>
-            <h1>{current.title}</h1>
-            {current.payload.attachmentUrl && /\.pdf(?:\?|$)/i.test(current.payload.attachmentUrl) && (
-              <iframe className="content-document" src={`${apiUrl}${current.payload.attachmentUrl}`} title={current.payload.attachmentName ?? current.title} />
-            )}
-            {current.payload.attachmentUrl && /\.(png|jpe?g|webp)(?:\?|$)/i.test(current.payload.attachmentUrl) && (
-              <img className="content-media" src={`${apiUrl}${current.payload.attachmentUrl}`} alt={current.payload.attachmentName ?? current.title} />
-            )}
-            {current.payload.attachmentUrl && /\.mp4(?:\?|$)/i.test(current.payload.attachmentUrl) && (
-              <video autoPlay className="content-media" loop muted playsInline src={`${apiUrl}${current.payload.attachmentUrl}`} />
-            )}
-            {current.payload.imageUrl && (
-              <img className="content-media" src={current.payload.imageUrl} alt={current.title} />
-            )}
-            {current.payload.videoUrl && (
-              <StreamVideo src={current.payload.videoUrl} title={current.title} />
-            )}
-            {current.payload.text && <p className="content-text">{current.payload.text}</p>}
-            {current.payload.attachmentName && <span className="attachment-caption">{current.payload.attachmentName}</span>}
-          </>
-        ) : (
-          <>
-            <p className="content-type">YAYIN BEKLENİYOR</p>
-            <h1>BilTekMYO İnline</h1>
-            <p className="content-text">Bu ekran için aktif bir içerik bulunmuyor.</p>
-          </>
-        )}
+        <section className="stage">
+          {current ? (
+            <div className="slide" key={`${current.id}:${slideIndex}`}>
+              <Slide apiUrl={apiUrl} item={current} />
+            </div>
+          ) : (
+            <div className="slide">
+              <div className="slide-text slide-idle">
+                <span className="slide-chip">Yayın bekleniyor</span>
+                <h1 className="title-xl">{connection === 'offline' ? 'Sunucuya ulaşılamıyor' : 'Hoş geldiniz'}</h1>
+                <p className="slide-body">{connection === 'offline' ? 'Bağlantı geldiğinde yayın kendiliğinden başlar.' : 'Bu ekran için şu anda aktif içerik bulunmuyor.'}</p>
+              </div>
+            </div>
+          )}
+          {current && orderedItems.length > 1 && !isHoldingStream && (
+            <div className="slide-progress" aria-hidden="true">
+              <i key={`${current.id}:${slideIndex}`} style={{ animationDuration: `${current.durationSeconds}s` }} />
+            </div>
+          )}
         </section>
-        <aside className="metrics-panel" aria-label="Canlı görüntü işleme sonuçları">
-          <div className="metrics-heading">
-            <div>
-              <p className="metrics-eyebrow">BİLTEKMYO · AI BOX</p>
-              <h2>Canlı analiz</h2>
-            </div>
-            <span className={`metrics-connection ${metricsConnection}`}>
-              <span className="dot" />
-              {metricsConnection === 'live' ? 'BAĞLI' : metricsConnection === 'offline' ? 'ÇEVRİMDIŞI' : 'BAĞLANIYOR'}
-            </span>
-          </div>
-          <div className="metrics-hero">
-            <div>
-              <span className="metrics-label">SON ALGILAMA</span>
-              <p>{latestMetric?.cameraId ?? 'Kamera verisi bekleniyor'}</p>
-            </div>
-            <strong>{latestMetric ? latestMetric.peopleCount : '—'}</strong>
-            <span className="metrics-unit">kişi</span>
-          </div>
-          <div className="metrics-table-heading">
-            <div>
-              <h3>Kamera sonuçları</h3>
-              <p>Her kamera için son anonim ölçüm</p>
-            </div>
-            <span className="camera-count">{cameraMetrics.length} kamera</span>
-          </div>
-          <div className="metrics-table-wrap">
-            <table className="metrics-table">
-              <thead>
-                <tr><th>Kamera</th><th>Kişi</th><th>Giriş</th><th>Çıkış</th><th>Doluluk</th></tr>
-              </thead>
-              <tbody>
-                {cameraMetrics.length ? cameraMetrics.map((metric) => (
-                  <tr key={`${metric.aiBoxId}:${metric.cameraId}`}>
-                    <td><span className="camera-indicator" />{metric.cameraId}</td>
-                    <td className="metric-number">{metric.peopleCount}</td>
-                    <td>{metric.entries}</td>
-                    <td>{metric.exits}</td>
-                    <td>{metric.estimatedOccupancy}</td>
-                  </tr>
-                )) : (
-                  <tr><td className="metrics-empty" colSpan={5}>
-                    {metricsConnection === 'offline' ? 'Metrik sunucusuna ulaşılamıyor.' : 'Gerçek model çıktısı geldiğinde burada görünecek.'}
-                  </td></tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-          <div className="metrics-footer">
-            <span>Son ölçüm</span>
-            <strong>{latestMetric ? new Date(latestMetric.capturedAt).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '—'}</strong>
-            <span className="privacy-label">Anonim sayaçlar · görüntü saklanmaz</span>
-          </div>
-        </aside>
+
+        {!isEmergency && (
+          <aside className="rail" aria-label="Sıradaki yayınlar ve canlı sonuçlar">
+            {orderedItems.length > 1 && (
+              <section className="rail-block">
+                <div className="rail-head"><h2>Sıradaki</h2><span>{slideIndex + 1} / {orderedItems.length}</span></div>
+                <ol className="up-next">
+                  {upNext.map((item, index) => <li key={`${item.id}:${index}`}><span>{typeLabels[item.type]}</span><strong>{item.title}</strong></li>)}
+                </ol>
+              </section>
+            )}
+            <section className="rail-block rail-metrics">
+              <div className="rail-head">
+                <h2>Canlı analiz</h2>
+                <span className={`metrics-connection ${metricsConnection}`}><span className="dot" />{metricsConnection === 'live' ? 'Bağlı' : metricsConnection === 'offline' ? 'Çevrimdışı' : 'Bağlanıyor'}</span>
+              </div>
+              {latestMetric ? (
+                <>
+                  <div className="metrics-hero"><strong>{latestMetric.peopleCount}</strong><span>kişi<small>{latestMetric.cameraId}</small></span></div>
+                  <table className="metrics-table">
+                    <thead><tr><th>Kamera</th><th>Kişi</th><th>Giriş</th><th>Çıkış</th><th>Doluluk</th></tr></thead>
+                    <tbody>
+                      {cameraMetrics.map((metric) => (
+                        <tr key={`${metric.aiBoxId}:${metric.cameraId}`}>
+                          <td>{metric.cameraId}</td>
+                          <td className="metric-number">{metric.peopleCount}</td>
+                          <td>{metric.entries}</td>
+                          <td>{metric.exits}</td>
+                          <td>{metric.estimatedOccupancy}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </>
+              ) : (
+                <p className="metrics-empty">{metricsConnection === 'offline' ? 'Metrik sunucusuna ulaşılamıyor.' : 'Kamera verisi geldiğinde burada görünecek.'}</p>
+              )}
+              <p className="privacy-label">Anonim sayaçlar · görüntü saklanmaz{latestMetric ? ` · ${new Date(latestMetric.capturedAt).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}` : ''}</p>
+            </section>
+          </aside>
+        )}
       </div>
-      <div className={`player-status ${connection}`} aria-live="polite">
-        <span className="dot" />
-        {connection === 'live' ? 'CANLI' : connection === 'offline' ? 'BAĞLANTI YOK' : 'BAĞLANIYOR'}
-        <span className="status-display">{displayId}</span>
-      </div>
+
       <button className="fullscreen-toggle" type="button" onClick={() => void toggleFullscreen()} aria-label={fullscreen ? 'Tam ekrandan çık' : 'Tam ekran yap'} title={fullscreen ? 'Tam ekrandan çık' : 'Tam ekran yap'}>
-        {fullscreen ? '⤢' : '⛶'}
+        <svg aria-hidden="true" fill="none" height="18" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" width="18"><path d={fullscreen ? 'M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5' : 'M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5'} /></svg>
       </button>
     </main>
   );
 }
-
-
-
