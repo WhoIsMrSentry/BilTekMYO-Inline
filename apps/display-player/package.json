@@ -1,0 +1,25 @@
+{
+  "name": "@biltekmyo/display-player",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "next build",
+    "build:core": "tsc -p tsconfig.core.json",
+    "dev": "next dev",
+    "start": "next start",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "pnpm build:core && node test/display-player.test.mjs"
+  },
+  "dependencies": {
+    "@biltekmyo/shared-types": "workspace:*",
+    "hls.js": "^1.7.3",
+    "next": "^15.1.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0"
+  }
+}
