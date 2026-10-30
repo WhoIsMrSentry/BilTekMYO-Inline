@@ -119,6 +119,10 @@ export default function DisplayPage() {
   const current = orderedItems[currentIndex % Math.max(orderedItems.length, 1)];
   const cameraMetrics = metricsSnapshot?.cameras ?? [];
   const latestMetric = cameraMetrics[0];
+  const typeLabels: Record<DisplayContent['type'], string> = {
+    announcement: 'Duyuru', image: 'Görsel', video: 'Video', 'school-info': 'Okul bilgisi',
+    metrics: 'Kamera özeti', emergency: 'Acil duyuru',
+  };
 
   useEffect(() => {
     if (!current) return;
@@ -136,7 +140,7 @@ export default function DisplayPage() {
         <section className="slide">
         {current ? (
           <>
-            <p className="content-type">{current.type === 'emergency' ? 'ACİL DUYURU' : current.type.toUpperCase()}</p>
+            <p className="content-type">{typeLabels[current.type]}</p>
             <h1>{current.title}</h1>
             {current.payload.attachmentUrl && /\.pdf(?:\?|$)/i.test(current.payload.attachmentUrl) && (
               <iframe className="content-document" src={`${apiUrl}${current.payload.attachmentUrl}`} title={current.payload.attachmentName ?? current.title} />
@@ -158,30 +162,30 @@ export default function DisplayPage() {
           </>
         ) : (
           <>
-            <p className="content-type">YAYIN BEKLENİYOR</p>
-            <h1>BilTekMYO İnline</h1>
-            <p className="content-text">Bu ekran için aktif bir içerik bulunmuyor.</p>
+            <p className="content-type">Yayın bekleniyor</p>
+            <h1>Şu an aktif içerik yok</h1>
+            <p className="content-text">Yeni bir duyuru yayınlandığında bu ekran otomatik olarak güncellenecek.</p>
           </>
         )}
         </section>
         <aside className="metrics-panel" aria-label="Canlı görüntü işleme sonuçları">
           <div className="metrics-heading">
             <div>
-              <p className="metrics-eyebrow">BİLTEKMYO · AI BOX</p>
+              <p className="metrics-eyebrow">BilTekMYO · AI Box</p>
               <h2>Canlı analiz</h2>
             </div>
             <span className={`metrics-connection ${metricsConnection}`}>
               <span className="dot" />
-              {metricsConnection === 'live' ? 'BAĞLI' : metricsConnection === 'offline' ? 'ÇEVRİMDIŞI' : 'BAĞLANIYOR'}
+              {metricsConnection === 'live' ? 'Bağlı' : metricsConnection === 'offline' ? 'Çevrimdışı' : 'Bağlanıyor'}
             </span>
           </div>
           <div className="metrics-hero">
             <div>
-              <span className="metrics-label">SON ALGILAMA</span>
+              <span className="metrics-label">Son algılama</span>
               <p>{latestMetric?.cameraId ?? 'Kamera verisi bekleniyor'}</p>
             </div>
             <strong>{latestMetric ? latestMetric.peopleCount : '—'}</strong>
-            <span className="metrics-unit">kişi</span>
+            {latestMetric && <span className="metrics-unit">kişi</span>}
           </div>
           <div className="metrics-table-heading">
             <div>
@@ -221,7 +225,7 @@ export default function DisplayPage() {
       </div>
       <div className={`player-status ${connection}`} aria-live="polite">
         <span className="dot" />
-        {connection === 'live' ? 'CANLI' : connection === 'offline' ? 'BAĞLANTI YOK' : 'BAĞLANIYOR'}
+        {connection === 'live' ? 'Canlı' : connection === 'offline' ? 'Bağlantı yok' : 'Bağlanıyor'}
         <span className="status-display">{displayId}</span>
       </div>
       <button className="fullscreen-toggle" type="button" onClick={() => void toggleFullscreen()} aria-label={fullscreen ? 'Tam ekrandan çık' : 'Tam ekran yap'} title={fullscreen ? 'Tam ekrandan çık' : 'Tam ekran yap'}>
