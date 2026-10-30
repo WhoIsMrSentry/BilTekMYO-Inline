@@ -29,6 +29,8 @@ const paths = {
   file: 'M6 3h8l5 5v12a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1ZM14 3v5h5',
   check: 'm5 12.500 4.500 4.500L19 7.500',
   arrowRight: 'M5 12h14M13 6l6 6-6 6',
+  chevronLeft: 'M15 5.500 8.500 12l6.500 6.500',
+  chevronRight: 'M9 5.500 15.500 12 9 18.500',
   clock: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18ZM12 7.500V12l3 2',
   mapPin: 'M12 21s7-6 7-11.500a7 7 0 1 0-14 0C5 15 12 21 12 21ZM12 7a2.500 2.500 0 1 0 0 5 2.500 2.500 0 0 0 0-5Z',
   shield: 'M12 3 5 5.500V11c0 5 3 8.500 7 10 4-1.500 7-5 7-10V5.500L12 3ZM9 12l2 2 4-4',
@@ -46,14 +48,6 @@ export function Icon({ name, size = 18, className }: { name: IconName; size?: nu
   );
 }
 
-export function BrandMark({ size = 40 }: { size?: number }) {
-  return (
-    <span className="brand-mark" style={{ width: size, height: size }}>
-      <svg aria-hidden="true" fill="none" height="62%" viewBox="0 0 24 24" width="62%">
-        <path d="M5 4.500h7.500a4 4 0 0 1 1.800 7.560A4.200 4.200 0 0 1 13 20H5V4.500Z" stroke="currentColor" strokeLinejoin="round" strokeWidth="2.400" />
-        <path d="M9 12.200h4" stroke="currentColor" strokeLinecap="round" strokeWidth="2.400" />
-        <circle cx="20" cy="18.500" fill="var(--brand-spark, #7ff0d6)" r="2" />
-      </svg>
-    </span>
-  );
+export function BrandLockup() {
+  return <span className="brand-lockup"><strong>Anadolu Üniversitesi</strong><small>Bilişim Teknolojileri Meslek Yüksekokulu</small></span>;
 }
