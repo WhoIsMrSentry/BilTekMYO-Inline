@@ -11,7 +11,7 @@ async function bootstrap(): Promise<void> {
     .split(',').map((origin) => origin.trim()).filter(Boolean);
   app.enableCors({ origin: allowedOrigins, credentials: true });
   app.enableShutdownHooks();
-  await app.listen(Number(process.env.PORT ?? 3000), '0.0.0.0');
+  await app.listen(Number(process.env.PORT ?? 3000), process.env.HOST ?? '0.0.0.0');
 }
 
 void bootstrap();

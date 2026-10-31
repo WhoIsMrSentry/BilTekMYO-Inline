@@ -13,18 +13,20 @@ pnpm install
 pnpm dev:up
 ```
 
-Başlatma betiği `.env` dosyası yoksa `.env.example` üzerinden oluşturur. Docker kipinde şemayı uygular ve örnek ekranları ekler. Her iki kipte API’yi derler, ardından ayrı PowerShell pencerelerinde API, admin paneli ve player’ı açar. Docker’ı sonradan kurarsanız kalıcı veritabanı ve Office dönüşümü için aynı `pnpm dev:up` komutunu yeniden kullanın.
+Başlatma betiği `.env` dosyası yoksa `.env.example` üzerinden oluşturur. Docker kipinde şemayı uygular ve örnek ekranları ekler. Her iki kipte API’yi derler; API, admin paneli ve player’ı arka planda başlatır, terminal penceresi açmaz. Docker’ı sonradan kurarsanız kalıcı veritabanı ve Office dönüşümü için aynı `pnpm dev:up` komutunu yeniden kullanın.
 
-Komut varsayılan olarak admin paneli için 3001, player için 3002 ve API için 3000 portlarını kullanır. Bu portlar doluysa boş port seçer; gerçek adresleri ve log klasörünü terminal çıktısında gösterir.
+Yerel mod yalnızca bu bilgisayardan erişilecek şekilde 127.0.0.1’e bağlanır. API 3000, admin 3001, player 3002 portlarını kullanır; port doluysa başka portlar açmak yerine açık bir hata verir. Süreç kayıtları `var/dev-processes.json`, port bilgisi `var/dev-ports.json`, günlükler `var/logs/` altındadır. Durdurmak için `pnpm dev:down` kullanın.
 
 - Admin panel: başlatma çıktısındaki adres
 - Player: başlatma çıktısındaki adres + `/?display=display-01` (sunum/kiosk görünümü)
 - API: başlatma çıktısındaki adres
 - Servis logları: `var/logs/`
 
+Okul ağındaki diğer cihazlardan erişim gerekiyorsa sunucunun sabit IP/DNS adını vererek `pnpm dev:up -- -Lan -LanHost 192.168.1.20` kullanın. Bu mod 3000–3002 portlarını ağ arayüzüne bağlar. Windows Güvenlik Duvarı’nda bu portlara yalnızca okulun güvenilir ağı ve gereken istemci/AI Box cihazları için izin verin. PostgreSQL 5432 ve belge dönüştürücü 3030 loopback dışına açılmaz. Sunucuyu kampüs ağına kalıcı dağıtmak için geliştirme sunucuları yerine HTTPS reverse proxy ve TLS sertifikası kullanın.
+
 Docker’sız kipte ekranlar ve içerikler bellek verisidir; API’yi kapatmak bunları sıfırlar. PDF, görsel ve MP4 ekleri yerel dosyada çalışır. DOCX/PPTX ekleri için Docker converter gerekir.
 
-İlk yerel giriş: `admin` / `change-this-local-password`. Gerçek ortamda `.env` içindeki kullanıcı adı, parola, oturum sırrı ve AI Box anahtarını mutlaka değiştirin. Durdurmak için açılan servis pencerelerini kapatın; PostgreSQL’i durdurmak için `docker compose -f infrastructure/docker/docker-compose.yml stop` çalıştırın.
+İlk yerel giriş: `admin` / `change-this-local-password`. Gerçek ortamda `.env` içindeki kullanıcı adı, parola, oturum sırrı ve AI Box anahtarını mutlaka değiştirin. Uygulamaları `pnpm dev:down` ile durdurun; PostgreSQL’i durdurmak için `docker compose -f infrastructure/docker/docker-compose.yml stop` çalıştırın.
 
 ## Temalar
 
