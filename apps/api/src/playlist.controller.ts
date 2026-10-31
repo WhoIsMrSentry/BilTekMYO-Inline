@@ -1,14 +1,14 @@
-import { Controller, Get, Param, Req, Res } from '@nestjs/common';
+import { Controller, Get, Param, Res } from '@nestjs/common';
 import type { PlaylistSnapshot } from '@biltekmyo/shared-types';
 import { PlaylistService } from './playlist.service.js';
 import { ContentService } from './content.service.js';
 
-type EventRequest = { on(event: 'close', listener: () => void): void };
 type EventResponse = {
   setHeader(name: string, value: string): void;
   flushHeaders?: () => void;
   write(chunk: string): void;
   end(): void;
+  on(event: 'close', listener: () => void): void;
 };
 
 @Controller('playlists')
@@ -23,7 +23,6 @@ export class PlaylistController {
   @Get(':displayId/events')
   async events(
     @Param('displayId') displayId: string,
-    @Req() request: EventRequest,
     @Res() response: EventResponse,
   ): Promise<void> {
     await this.playlists.snapshot(displayId);
@@ -33,14 +32,16 @@ export class PlaylistController {
     response.setHeader('X-Accel-Buffering', 'no');
     response.flushHeaders?.();
 
-    const sendUpdate = () => response.write('data: playlist-updated\n\n');
+    let closed = false;
+    const sendUpdate = () => { if (!closed) response.write('data: playlist-updated\n\n'); };
     sendUpdate();
     const unsubscribe = this.content.onChanged(sendUpdate);
-    const keepAlive = setInterval(() => response.write(': keepalive\n\n'), 20_000);
-    request.on('close', () => {
+    const keepAlive = setInterval(() => { if (!closed) response.write(': keepalive\n\n'); }, 20_000);
+    response.on('close', () => {
+      if (closed) return;
+      closed = true;
       clearInterval(keepAlive);
       unsubscribe();
-      response.end();
     });
   }
 }

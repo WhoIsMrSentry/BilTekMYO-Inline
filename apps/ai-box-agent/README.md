@@ -66,18 +66,21 @@ python apps/ai-box-agent/scripts/camera_test.py --model models/pretrained/yolox_
 ```
 
 Önizleme penceresi algılanan kişileri ve FPS'i gösterir; kareler diske
-yazılmaz. `Q` veya `Esc` ile kapatılır. `--provider` seçeneği `cpu`, `cuda`,
-`directml`, `tensorrt` veya `auto` kabul eder; seçilen sağlayıcı kurulu değilse
-açık hata verir. DGX Spark için ONNX'ten cihaz üzerinde TensorRT engine üretimi
-ve AI Box agent'a üretim bağlantısı sonraki adımdır.
+yazılmaz. Kamera görüntüsü varsayılan olarak 1280×720 alınır. `Q` veya `Esc`
+ile kapatılır. NVIDIA ekran kartlı Windows bilgisayarda `directml`, CUDA
+kurulumu olan sistemlerde `cuda` sağlayıcısını seçin. `auto`, kurulu en hızlı
+sağlayıcıyı seçer; seçilen sağlayıcı kullanılabilir değilse açık hata verir.
+DGX Spark için ONNX'ten cihaz üzerinde TensorRT engine üretimi ve AI Box agent'a
+üretim bağlantısı sonraki adımdır.
 
 ### İşlenmiş kareyi yayın ekranında gösterme
 
-Yerel kamerayı YOLOX ile işleyip kişi kutuları çizilmiş düşük çözünürlüklü
-kareleri (varsayılan en fazla 20 FPS) ve anonim ölçümü API'ye gönderebilirsiniz.
+Yerel kamerayı YOLOX ile işleyip kişi kutuları çizilmiş 720p'e kadar kareleri
+(varsayılan en fazla 20 FPS) ve anonim ölçümü API'ye gönderebilirsiniz.
 API aktarımı kamera görüntüsünü durdurmaması için ayrı bir iş parçacığında yapılır;
 bekleyen eski kareler atılır ve en güncel kare tutulur. Kareler dosyaya yazılmaz;
-API yalnızca son kareyi 15 saniyeye kadar bellekte tutar. Yayın adresi ekran
+API yalnızca son kareyi 15 saniyeye kadar bellekte tutar. JPEG kareleri en fazla
+64 KB'tır. Yayın adresi ekran
 başına imzalanır ve 90 saniyede yenilenir. Kameradan gelen görüntü kampüs
 ekranında görüleceği için `--publish-preview` seçeneğini yalnızca bu yayına
 izin verilen ekranda kullanın.
@@ -85,12 +88,18 @@ izin verilen ekranda kullanın.
 PowerShell:
 
 ```powershell
-python -m pip install -e 'apps/ai-box-agent[camera-cpu]'
+python -m pip install -e 'apps/ai-box-agent[camera-directml]'
 $env:AI_BOX_API_KEY = (Get-Content .env | Where-Object { $_ -match '^AI_BOX_API_KEY=' } | Select-Object -First 1).Split('=', 2)[1]
-python apps/ai-box-agent/scripts/camera_test.py --model models/pretrained/yolox_nano.onnx --camera 0 --provider auto --cpu-threads 2 --preview-fps 20 --publish-preview --api-url http://localhost:3000
+python apps/ai-box-agent/scripts/camera_test.py --model models/pretrained/yolox_nano.onnx --camera 0 --provider directml --gpu-index 1 --capture-width 1280 --capture-height 720 --preview-fps 10 --publish-preview
 ```
 
-Ardından `http://localhost:3002/?display=display-01` ekranını açın. Tetiklenince
+Bu çift GPU'lu Windows bilgisayarında DirectML `--gpu-index 1` ile RTX 5060'ı
+seçiyor; başka cihazlarda adaptör numarası farklı olabilir.
+
+Önce `pnpm dev:up` ile servisleri başlatın. `camera_test.py`, doğru API adresini
+`var/dev-ports.json` dosyasından otomatik alır; `--api-url` yalnızca servisleri
+elle farklı bir portta çalıştırdıysanız verin. Ardından `dev:up` çıktısındaki
+yayın ekranı adresini açın. Tetiklenince
 OpenCV işlenmiş kareleri MJPEG canlı akışı olarak yalnızca ana duyuru alanında
 gösterir; üst bilgi, sıradaki yayınlar ve analiz paneli görünür kalır.
 Kamerayı durdurmak için önizleme penceresinde `Q` veya `Esc` tuşuna basın.

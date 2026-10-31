@@ -1,7 +1,9 @@
 param(
   [switch]$Memory,
   [switch]$NoDatabase,
-  [switch]$NoBuild
+  [switch]$NoBuild,
+  [switch]$Lan,
+  [string]$LanHost
 )
 
 $ErrorActionPreference = 'Stop'
@@ -148,39 +150,76 @@ function Test-PortInUse([int]$Port) {
   return $false
 }
 
-function Find-FreePort([int]$Preferred, [System.Collections.Generic.HashSet[int]]$Reserved) {
-  for ($candidate = $Preferred; $candidate -lt ($Preferred + 100); $candidate++) {
-    if ($Reserved.Contains($candidate) -or (Test-PortInUse $candidate)) { continue }
-    $Reserved.Add($candidate) | Out-Null
-    return $candidate
+$ports = [ordered]@{ api = 3000; admin = 3001; player = 3002 }
+foreach ($service in $ports.GetEnumerator()) {
+  if (Test-PortInUse $service.Value) {
+    throw "Port $($service.Value) ($($service.Key)) is already in use. Stop it with pnpm dev:down or free the port; the launcher will not silently choose extra ports."
   }
-  throw "No free local port found starting at $Preferred."
 }
-
-$reservedPorts = [System.Collections.Generic.HashSet[int]]::new()
-$apiPort = Find-FreePort 3000 $reservedPorts
-$adminPort = Find-FreePort 3001 $reservedPorts
-$playerPort = Find-FreePort 3002 $reservedPorts
-$adminOrigin = "http://localhost:$adminPort,http://localhost:$playerPort"
-$apiUrl = "http://localhost:$apiPort"
+if ($Lan -and [string]::IsNullOrWhiteSpace($LanHost)) {
+  throw "LAN mode needs -LanHost with this server's LAN IP or DNS name, for example: pnpm dev:up -- -Lan -LanHost 192.168.1.20"
+}
+$bindAddress = if ($Lan) { '0.0.0.0' } else { '127.0.0.1' }
+$publicHost = if ($Lan) { $LanHost } else { 'localhost' }
+$apiUrl = 'http://' + $publicHost + ':' + $ports.api
+$adminUrl = 'http://' + $publicHost + ':' + $ports.admin
+$playerUrl = 'http://' + $publicHost + ':' + $ports.player
+$adminOrigin = "$adminUrl,$playerUrl"
 $logDirectory = Join-Path $root 'var\logs'
 New-Item -ItemType Directory -Force -Path $logDirectory | Out-Null
-$services = @(
-  @{ Name = 'BilTekMYO API'; Directory = $root; Port = $apiPort; Script = "`$env:PORT='$apiPort'; `$env:ADMIN_PANEL_ORIGIN='$adminOrigin'; Set-Location -LiteralPath '$root'; node apps/api/dist/main.js *>&1 | Tee-Object -FilePath '$logDirectory\api.log' -Append" },
-  @{ Name = 'BilTekMYO Admin'; Directory = (Join-Path $root 'apps\admin-panel'); Port = $adminPort; Script = "`$env:NEXT_PUBLIC_API_URL='$apiUrl'; `$env:NEXT_PUBLIC_PLAYER_URL='http://localhost:$playerPort'; `$env:NEXT_DIST_DIR='.next-dev-$adminPort'; Set-Location -LiteralPath '$(Join-Path $root 'apps\admin-panel')'; node node_modules/next/dist/bin/next dev --port $adminPort *>&1 | Tee-Object -FilePath '$logDirectory\admin.log' -Append" },
-  @{ Name = 'BilTekMYO Player'; Directory = (Join-Path $root 'apps\display-player'); Port = $playerPort; Script = "`$env:NEXT_PUBLIC_API_URL='$apiUrl'; `$env:NEXT_DIST_DIR='.next-dev-$playerPort'; Set-Location -LiteralPath '$(Join-Path $root 'apps\display-player')'; node node_modules/next/dist/bin/next dev --port $playerPort *>&1 | Tee-Object -FilePath '$logDirectory\player.log' -Append" }
-)
-foreach ($service in $services) {
-  $encoded = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($service.Script))
-  Start-Process -FilePath 'powershell.exe' -WindowStyle Normal -ArgumentList @('-NoExit', '-ExecutionPolicy', 'Bypass', '-EncodedCommand', $encoded) | Out-Null
-  Write-Host "Started: $($service.Name) on port $($service.Port)"
+$portManifestPath = Join-Path $root 'var\dev-ports.json'
+$processManifestPath = Join-Path $root 'var\dev-processes.json'
+$apiEntry = Join-Path $root 'apps\api\dist\main.js'
+$adminNext = Join-Path $root 'apps\admin-panel\node_modules\next\dist\bin\next'
+$playerNext = Join-Path $root 'apps\display-player\node_modules\next\dist\bin\next'
+$portManifest = [ordered]@{
+  apiUrl = $apiUrl
+  adminUrl = $adminUrl
+  playerUrl = $playerUrl
+  apiPort = $ports.api
+  adminPort = $ports.admin
+  playerPort = $ports.player
 }
+$portManifestJson = $portManifest | ConvertTo-Json
+[System.IO.File]::WriteAllText($portManifestPath, $portManifestJson, [System.Text.UTF8Encoding]::new($false))
+$services = @(
+  @{ Name = 'api'; Port = $ports.api; WorkingDirectory = $root; Entry = $apiEntry; Arguments = ('"' + $apiEntry + '"'); Environment = @{ HOST = $bindAddress; PORT = [string]$ports.api; ADMIN_PANEL_ORIGIN = $adminOrigin } },
+  @{ Name = 'admin'; Port = $ports.admin; WorkingDirectory = (Join-Path $root 'apps\admin-panel'); Entry = $adminNext; Arguments = ('"' + $adminNext + '" dev --hostname ' + $bindAddress + ' --port ' + $ports.admin); Environment = @{ NEXT_PUBLIC_API_URL = $apiUrl; NEXT_PUBLIC_PLAYER_URL = "$playerUrl/?display=display-01"; NEXT_DIST_DIR = ".next-dev-$($ports.admin)" } },
+  @{ Name = 'player'; Port = $ports.player; WorkingDirectory = (Join-Path $root 'apps\display-player'); Entry = $playerNext; Arguments = ('"' + $playerNext + '" dev --hostname ' + $bindAddress + ' --port ' + $ports.player); Environment = @{ NEXT_PUBLIC_API_URL = $apiUrl; NEXT_DIST_DIR = ".next-dev-$($ports.player)" } }
+)
+$started = [System.Collections.Generic.List[object]]::new()
+$runStamp = Get-Date -Format 'yyyyMMdd-HHmmss'
+try {
+  foreach ($service in $services) {
+    $oldValues = @{}
+    foreach ($key in $service.Environment.Keys) {
+      $oldValues[$key] = [Environment]::GetEnvironmentVariable($key, 'Process')
+      [Environment]::SetEnvironmentVariable($key, $service.Environment[$key], 'Process')
+    }
+    try {
+      $stdout = Join-Path $logDirectory "$($service.Name)-$runStamp.log"
+      $stderr = Join-Path $logDirectory "$($service.Name)-$runStamp.error.log"
+      $process = Start-Process -FilePath 'node' -ArgumentList $service.Arguments -WorkingDirectory $service.WorkingDirectory -WindowStyle Hidden -PassThru -RedirectStandardOutput $stdout -RedirectStandardError $stderr
+      $started.Add([pscustomobject]@{ name = $service.Name; port = $service.Port; pid = $process.Id; startTimeUtcTicks = $process.StartTime.ToUniversalTime().Ticks; entry = $service.Entry })
+    } finally {
+      foreach ($key in $service.Environment.Keys) { [Environment]::SetEnvironmentVariable($key, $oldValues[$key], 'Process') }
+    }
+  }
+} catch {
+  foreach ($service in $started) { try { & taskkill.exe /PID $service.pid /T /F *> $null } catch {} }
+  throw
+}
+$processManifest = [ordered]@{ root = $root; services = @($started) } | ConvertTo-Json -Depth 5
+[System.IO.File]::WriteAllText($processManifestPath, $processManifest, [System.Text.UTF8Encoding]::new($false))
 Write-Host ''
-Write-Host "Admin:  http://localhost:$adminPort"
-Write-Host "Player: http://localhost:$playerPort/?display=display-01"
+Write-Host 'Services started in the background; no terminal windows were opened.'
+Write-Host "Admin:  $adminUrl"
+Write-Host "Player: $playerUrl/?display=display-01"
 Write-Host "API:    $apiUrl"
 Write-Host "Service logs: $logDirectory"
-Write-Host 'Close the service windows to stop the apps.'
+Write-Host 'Stop app services with: pnpm dev:down'
+if ($Lan) { Write-Warning 'LAN mode binds ports 3000-3002 to all interfaces. Limit Windows Firewall access to trusted school subnets and authorized devices.' }
+else { Write-Host 'Local-only mode binds services to 127.0.0.1. Use -Lan -LanHost <server-IP-or-DNS> only when LAN clients need access.' }
 if ($memoryMode) { Write-Host 'In-memory content resets when the API window closes.' } else { Write-Host 'Database content persists in the Docker PostgreSQL volume.' }
 
 

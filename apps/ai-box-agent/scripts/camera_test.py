@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import sys
 import time
@@ -16,6 +17,21 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from ai_box_agent.inference import YoloXOnnxRuntimeEngine
 from ai_box_agent.client import ApiClient
+
+
+def default_api_url() -> str:
+    configured_url = os.environ.get("BILTEKMYO_API_URL")
+    if configured_url:
+        return configured_url
+    manifest_path = PROJECT_ROOT / "var" / "dev-ports.json"
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8-sig"))
+        api_url = manifest.get("apiUrl")
+        if isinstance(api_url, str) and api_url.startswith(("http://", "https://")):
+            return api_url
+    except (OSError, json.JSONDecodeError):
+        pass
+    return "http://localhost:3000"
 
 
 def parse_args() -> argparse.Namespace:
@@ -37,12 +53,19 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--confidence", type=float, default=0.35)
     parser.add_argument("--input-size", type=int, choices=(416,), default=416,
                         help="Bu model dosyası 416x416 sabit giriş kullanır.")
+    parser.add_argument("--capture-width", type=int, default=1280,
+                        help="Kameradan alınacak kare genişliği (varsayılan: 1280).")
+    parser.add_argument("--capture-height", type=int, default=720,
+                        help="Kameradan alınacak kare yüksekliği (varsayılan: 720).")
     parser.add_argument("--cpu-threads", type=int, default=2,
                         help="ONNX Runtime CPU iş parçacığı sayısı.")
+    parser.add_argument("--gpu-index", type=int, default=0,
+                        help="DirectML ekran kartı indeksi (varsayılan: 0).")
     parser.add_argument("--preview-fps", type=float, default=20.0,
                         help="Yayın ekranına gönderilecek en yüksek kare hızı (varsayılan: 20).")
     parser.add_argument("--publish-preview", action="store_true", help="Publish the annotated preview and anonymous metrics to the assigned display.")
-    parser.add_argument("--api-url", default="http://localhost:3000")
+    parser.add_argument("--api-url", default=default_api_url(),
+                        help="API adresi; varsayılan dev:up tarafından kaydedilen adrestir.")
     parser.add_argument("--camera-id", default="camera-01")
     return parser.parse_args()
 
@@ -56,6 +79,7 @@ def main() -> int:
         confidence_threshold=args.confidence,
         input_size=args.input_size,
         cpu_threads=args.cpu_threads,
+        directml_device_id=args.gpu_index,
     )
     backend = cv2.CAP_DSHOW if sys.platform == "win32" else cv2.CAP_ANY
     camera = cv2.VideoCapture(args.camera, backend)
@@ -63,8 +87,8 @@ def main() -> int:
         raise SystemExit(
             f"Kamera {args.camera} açılamadı. Windows kamera iznini ve aygıt numarasını kontrol edin."
         )
-    camera.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-    camera.set(cv2.CAP_PROP_FRAME_HEIGHT, 360)
+    camera.set(cv2.CAP_PROP_FRAME_WIDTH, args.capture_width)
+    camera.set(cv2.CAP_PROP_FRAME_HEIGHT, args.capture_height)
     camera.set(cv2.CAP_PROP_BUFFERSIZE, 1)
 
     api_client = None
@@ -75,12 +99,20 @@ def main() -> int:
             camera.release()
             raise SystemExit("AI_BOX_API_KEY ortam değişkeni --publish-preview için gerekli.")
         api_client = ApiClient(args.api_url, api_key=api_key)
-        api_client.register_ai_box({"id": "ai-box-camera-test", "name": "Yerel kamera testi", "cameraIds": [args.camera_id, paired_camera_id]})
-        api_client.send_heartbeat({
-            "aiBoxId": "ai-box-camera-test", "sentAt": datetime.now(timezone.utc).isoformat(),
-            "agentVersion": "camera-test", "modelVersion": Path(args.model).stem,
-            "cameraStatuses": {args.camera_id: "online", paired_camera_id: "offline"},
-        })
+        print(f"API hedefi: {args.api_url}", flush=True)
+        try:
+            api_client.register_ai_box({"id": "ai-box-camera-test", "name": "Yerel kamera testi", "cameraIds": [args.camera_id, paired_camera_id]})
+            api_client.send_heartbeat({
+                "aiBoxId": "ai-box-camera-test", "sentAt": datetime.now(timezone.utc).isoformat(),
+                "agentVersion": "camera-test", "modelVersion": Path(args.model).stem,
+                "cameraStatuses": {args.camera_id: "online", paired_camera_id: "offline"},
+            })
+        except RuntimeError as error:
+            camera.release()
+            raise SystemExit(
+                f"{error}\nAPI sunucusu kapalı ya da port yanlış. Önce pnpm dev:up çalıştırın; "
+                f"API adresini var/dev-ports.json veya dev:up çıktısından alın."
+            ) from None
 
     state_lock = Lock()
     capture_stop = Event()
@@ -88,7 +120,7 @@ def main() -> int:
     publish_stop = Event()
     metric_queue: Queue = Queue(maxsize=2)
     preview_queue: Queue = Queue(maxsize=1)
-    latest = {"frame": None, "version": 0, "detections": [], "people_count": 0, "captured_at": ""}
+    latest = {"frame": None, "version": 0, "detections": [], "people_count": 0, "captured_at": "", "inference_fps": 0.0}
 
     def capture_latest() -> None:
         while not capture_stop.is_set():
@@ -112,15 +144,18 @@ def main() -> int:
                 continue
             last_version = version
             try:
+                inference_started = time.perf_counter()
                 motion_seen = engine.motion_detected(frame) or motion_seen
                 detections = engine.detect(frame)
                 decoded = engine.decoder.decode(detections)
                 metrics = engine.metrics.aggregate(decoded.detections)
                 captured_at = datetime.now(timezone.utc).isoformat()
+                inference_fps = 1.0 / max(time.perf_counter() - inference_started, 1e-6)
                 with state_lock:
                     latest["detections"] = detections
                     latest["people_count"] = len(detections)
                     latest["captured_at"] = captured_at
+                    latest["inference_fps"] = inference_fps
                 if api_client:
                     event = {
                         "schemaVersion": 1, "aiBoxId": "ai-box-camera-test", "cameraId": args.camera_id,
@@ -145,13 +180,23 @@ def main() -> int:
     publisher_threads = []
     if api_client:
         def publish_metrics() -> None:
+            report_started = time.perf_counter()
+            published = 0
             while not publish_stop.is_set() or not metric_queue.empty():
                 try:
                     event = metric_queue.get(timeout=0.1)
                 except Empty:
                     continue
                 try:
+                    request_started = time.perf_counter()
                     api_client.send_metrics(event)
+                    last_request_ms = (time.perf_counter() - request_started) * 1000
+                    published += 1
+                    elapsed = time.perf_counter() - report_started
+                    if elapsed >= 5:
+                        print(f"API metrik aktarımı: {published / elapsed:.2f}/sn; son istek {last_request_ms:.0f} ms", flush=True)
+                        report_started = time.perf_counter()
+                        published = 0
                 except Exception as error:
                     print(f"Metrik gönderimi başarısız: {error}", flush=True)
                 finally:
@@ -181,13 +226,23 @@ def main() -> int:
                 time.sleep(max(0, interval - (time.perf_counter() - started_at)))
 
         def send_previews() -> None:
+            report_started = time.perf_counter()
+            published = 0
             while not publish_stop.is_set() or not preview_queue.empty():
                 try:
                     captured_at, jpeg = preview_queue.get(timeout=0.1)
                 except Empty:
                     continue
                 try:
+                    request_started = time.perf_counter()
                     api_client.send_camera_frame("ai-box-camera-test", args.camera_id, captured_at, jpeg)
+                    last_request_ms = (time.perf_counter() - request_started) * 1000
+                    published += 1
+                    elapsed = time.perf_counter() - report_started
+                    if elapsed >= 5:
+                        print(f"API önizleme aktarımı: {published / elapsed:.2f} FPS; son istek {last_request_ms:.0f} ms", flush=True)
+                        report_started = time.perf_counter()
+                        published = 0
                 except Exception as error:
                     print(f"Önizleme gönderimi başarısız: {error}", flush=True)
                 finally:
@@ -210,6 +265,7 @@ def main() -> int:
             with state_lock:
                 frame = latest["frame"].copy() if latest["frame"] is not None else None
                 detections = list(latest["detections"])
+                inference_fps = float(latest["inference_fps"])
             if frame is None:
                 time.sleep(0.01)
                 continue
@@ -230,9 +286,9 @@ def main() -> int:
             instant_fps = 1 / max(now - previous, 1e-6)
             fps = instant_fps if fps == 0 else fps * 0.85 + instant_fps * 0.15
             previous = now
-            cv2.rectangle(frame, (12, 12), (310, 82), (20, 32, 37), -1)
+            cv2.rectangle(frame, (12, 12), (590, 82), (20, 32, 37), -1)
             cv2.putText(frame, f"Gorulen kisi: {len(detections)}", (24, 42), cv2.FONT_HERSHEY_SIMPLEX, 0.72, (240, 248, 244), 2, cv2.LINE_AA)
-            cv2.putText(frame, f"{engine.provider_name}  |  {fps:.1f} FPS", (24, 68), cv2.FONT_HERSHEY_SIMPLEX, 0.48, (145, 205, 190), 1, cv2.LINE_AA)
+            cv2.putText(frame, f"AI {inference_fps:.2f} FPS  |  Onizleme {fps:.1f} FPS", (24, 68), cv2.FONT_HERSHEY_SIMPLEX, 0.48, (145, 205, 190), 1, cv2.LINE_AA)
             cv2.imshow("BilTekMYO - YOLOX kamera testi", frame)
             key = cv2.waitKey(1) & 0xFF
             if key in (ord("q"), 27):
