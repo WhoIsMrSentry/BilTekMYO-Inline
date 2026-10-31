@@ -41,7 +41,7 @@ h1, h2, .display-brand strong, .clock strong { font-family: var(--font-heading),
 .display.pointer-idle { cursor: none; }
 
 /* Top bar */
-.display-bar { display: flex; align-items: center; gap: clamp(12px, 1.4vw, 28px); min-height: clamp(52px, 8.4vh, 104px); margin: calc(var(--gap) * -1) calc(var(--gap) * -1) 0; padding: 0 clamp(14px, 1.6vw, 36px); background: var(--bar-bg); -webkit-backdrop-filter: blur(var(--panel-blur)); backdrop-filter: blur(var(--panel-blur)); }
+.display-bar { display: flex; align-items: center; gap: clamp(12px, 1.4vw, 28px); min-height: clamp(52px, 8.4vh, 104px); margin: calc(var(--gap) * -1) calc(var(--gap) * -1) 0; padding: 0 clamp(14px, 1.6vw, 36px); }
 .display-brand { display: flex; align-items: center; gap: .55em; margin-right: auto; color: var(--on-bar-soft); letter-spacing: .03em; font-size: clamp(15px, 1.35vw, 28px); }
 .display-brand strong { display: block; background: var(--wordmark-bg); background-size: 220% 100%; -webkit-background-clip: text; background-clip: text; color: transparent; font-weight: 700; animation: var(--flow-motion); }
 .display-brand span { display: block; font-size: .86em; font-weight: 500; }
@@ -68,7 +68,8 @@ h1, h2, .display-brand strong, .clock strong { font-family: var(--font-heading),
 @keyframes gradient-flow { to { background-position: 220% 0; } }
 .slide-text { display: flex; flex-direction: column; justify-content: center; gap: clamp(14px, 2.4vh, 40px); width: 100%; padding: clamp(24px, 5vw, 120px); }
 .slide-chip { display: inline-flex; align-items: center; gap: .5em; align-self: flex-start; padding: .32em .9em; border-radius: 99px; background: var(--chip-bg); color: var(--glow); font-size: clamp(14px, 1.25vw, 26px); font-weight: 700; }
-h1 { max-width: 22ch; background: var(--title-bg); background-size: 220% 100%; -webkit-background-clip: text; background-clip: text; color: transparent; filter: var(--title-filter); animation: var(--title-motion); font-weight: 700; line-height: 1.06; letter-spacing: 0; text-wrap: balance; overflow-wrap: anywhere; }
+/* background-clip paints only the box, so the padding keeps accents and descenders (Ş, ş, g) inside it. */
+h1 { max-width: 22ch; margin-block: -.16em; padding-block: .16em; background: var(--title-bg); background-size: 220% 100%; -webkit-background-clip: text; background-clip: text; color: transparent; filter: var(--title-filter); animation: var(--title-motion); font-weight: 700; line-height: 1.06; letter-spacing: 0; text-wrap: balance; overflow-wrap: anywhere; }
 .title-xl { font-size: clamp(44px, 7.4vw, 170px); }
 .title-lg { max-width: 24ch; font-size: clamp(36px, 5.2vw, 124px); }
 .title-md { max-width: 32ch; font-size: clamp(28px, 3.6vw, 88px); }
