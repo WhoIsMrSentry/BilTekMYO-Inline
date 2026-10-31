@@ -17,7 +17,6 @@
   --text-2: #cdd2da;
   --text-3: #a3a9b3;
   --glow: #9fd8ff;
-  --bar-bg: rgba(8, 9, 12, .82);
   --on-bar-soft: #f2f4f7;
   --stage-bg: linear-gradient(120deg, rgba(8, 9, 12, .78), rgba(8, 9, 12, .6) 60%, rgba(8, 9, 12, .42));
   --stage-glow: inset 0 0 0 1px rgba(255, 255, 255, .1), 0 0 70px rgba(159, 216, 255, .09);
