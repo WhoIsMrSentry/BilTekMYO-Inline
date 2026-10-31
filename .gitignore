@@ -20,6 +20,8 @@ var/uploads/
 *.tsbuildinfo
 
 var/logs/
+var/dev-ports.json
+var/dev-processes.json
 **/.next-dev-*/
 models/**/*.pth
 var/display-theme.json
