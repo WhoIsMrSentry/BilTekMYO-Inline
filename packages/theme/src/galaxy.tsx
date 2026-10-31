@@ -156,7 +156,8 @@ export function Galaxy({ interactive = false }: { interactive?: boolean }) {
     const sparkSprites = [...warm.slice(0, 2), ...cool.slice(0, 2)].map((color) => glowSprite(color, 20));
 
     function resize() {
-      const width = window.innerWidth; const height = window.innerHeight;
+      // A hidden window reports 0x0; a zero-sized sprite would throw in draw and end the frame loop.
+      const width = Math.max(window.innerWidth, 1); const height = Math.max(window.innerHeight, 1);
       scene = buildScene(width, height, warm, cool);
       canvas!.width = Math.round(width * scene.scale); canvas!.height = Math.round(height * scene.scale);
       if (still) draw(0);

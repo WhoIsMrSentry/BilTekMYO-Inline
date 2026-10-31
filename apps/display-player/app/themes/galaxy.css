@@ -16,7 +16,6 @@
   --text-2: #dcd3d8;
   --text-3: #b3a7ae;
   --glow: #ff9fb0;
-  --bar-bg: linear-gradient(100deg, rgba(136, 0, 27, .26), rgba(6, 4, 7, .72) 34%, rgba(6, 4, 7, .72) 68%, rgba(28, 122, 5, .2));
   --on-bar-soft: #fff;
   --stage-bg: linear-gradient(135deg, rgba(30, 2, 10, .34), rgba(4, 3, 5, .34) 55%, rgba(6, 22, 4, .22));
   --progress-bg: linear-gradient(90deg, #ff2d55, #7dff4f, #ff2d55, #7dff4f);
