@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import base64
+from urllib.parse import urlsplit, urlunsplit
 from urllib import request
 
 from .types import DeviceHeartbeat, MetricsEvent
@@ -9,7 +10,12 @@ from .types import DeviceHeartbeat, MetricsEvent
 
 class ApiClient:
     def __init__(self, base_url: str, api_key: str = "", timeout_seconds: float = 10.0) -> None:
-        self.base_url = base_url.rstrip("/")
+        parsed_url = urlsplit(base_url)
+        if parsed_url.hostname and parsed_url.hostname.lower() == "localhost":
+            port = f":{parsed_url.port}" if parsed_url.port else ""
+            host = f"{parsed_url.username}:{parsed_url.password}@" if parsed_url.username else ""
+            parsed_url = parsed_url._replace(netloc=f"{host}127.0.0.1{port}")
+        self.base_url = urlunsplit(parsed_url).rstrip("/")
         self.api_key = api_key
         self.timeout_seconds = timeout_seconds
 

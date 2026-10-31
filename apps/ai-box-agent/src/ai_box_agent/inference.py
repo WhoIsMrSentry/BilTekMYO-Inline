@@ -78,6 +78,7 @@ class YoloXOnnxRuntimeEngine(InferenceEngine):
         nms_threshold: float = 0.45,
         input_size: int = 416,
         cpu_threads: int = 2,
+        directml_device_id: int = 0,
     ) -> None:
         if not Path(model_path).is_file():
             raise FileNotFoundError(f"ONNX model was not found: {model_path}")
@@ -132,6 +133,11 @@ class YoloXOnnxRuntimeEngine(InferenceEngine):
                 "CUDAExecutionProvider",
                 "CPUExecutionProvider",
             ]
+        elif selected == "directml":
+            providers = [
+                (provider_name, {"device_id": directml_device_id}),
+                "CPUExecutionProvider",
+            ]
         elif selected != "cpu":
             providers.append("CPUExecutionProvider")
         self.provider_name = provider_name
@@ -139,6 +145,8 @@ class YoloXOnnxRuntimeEngine(InferenceEngine):
         session_options.intra_op_num_threads = cpu_threads
         session_options.inter_op_num_threads = 1
         session_options.execution_mode = ort.ExecutionMode.ORT_SEQUENTIAL
+        if selected == "directml":
+            session_options.enable_mem_pattern = False
         self.session = ort.InferenceSession(
             model_path, sess_options=session_options, providers=providers
         )
@@ -229,14 +237,14 @@ class YoloXOnnxRuntimeEngine(InferenceEngine):
         cv2 = self._cv2
         np = self._np
         height, width = frame.shape[:2]
-        scale = min(640 / width, 360 / height, 1.0)
+        scale = min(1280 / width, 720 / height, 1.0)
         preview = cv2.resize(frame, (max(1, int(width * scale)), max(1, int(height * scale))), interpolation=cv2.INTER_AREA)
         for detection in detections:
             x1, y1, x2, y2 = (int(value * scale) for value in detection.box)
             cv2.rectangle(preview, (x1, y1), (x2, y2), (87, 215, 178), 2)
             cv2.putText(preview, f"Kisi {detection.confidence:.0%}", (x1, max(20, y1 - 7)), cv2.FONT_HERSHEY_SIMPLEX, .48, (87, 215, 178), 1, cv2.LINE_AA)
         cv2.rectangle(preview, (0, 0), (preview.shape[1], 34), (23, 43, 39), -1)
-        cv2.putText(preview, f"Kisi: {people_count}  |  {self.provider_name}", (12, 23), cv2.FONT_HERSHEY_SIMPLEX, .55, (244, 250, 247), 1, cv2.LINE_AA)
+        cv2.putText(preview, f"Kisi: {people_count}", (18, 38), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (244, 250, 247), 2, cv2.LINE_AA)
         quality = 62
         while quality >= 38:
             encoded, output = cv2.imencode(".jpg", preview, [int(cv2.IMWRITE_JPEG_QUALITY), quality])
