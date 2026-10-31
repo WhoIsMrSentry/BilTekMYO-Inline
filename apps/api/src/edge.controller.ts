@@ -1,4 +1,4 @@
-import { Body, Controller, ForbiddenException, Get, Param, Post, Query, Req, Res, UseGuards } from '@nestjs/common';
+import { Body, Controller, ForbiddenException, Get, Param, Post, Query, Res, UseGuards } from '@nestjs/common';
 import type { CameraFrameEvent, DeviceHeartbeat, MetricsEvent } from '@biltekmyo/shared-types';
 import { AdminAuthGuard } from './admin-auth.guard.js';
 import { EdgeDeviceAuthGuard } from './edge-device-auth.guard.js';
@@ -6,12 +6,12 @@ import { EdgeRegistryService, type RegisteredAiBox } from './edge-registry.servi
 import { DisplayService } from './display.service.js';
 import { verifyDisplayCameraPreviewSignature } from './media-signing.js';
 
-type EventRequest = { on(event: 'close', listener: () => void): void };
 type EventResponse = {
   setHeader(name: string, value: string): void;
   flushHeaders?: () => void;
   write(chunk: string | Uint8Array): boolean;
   end(): void;
+  on(event: 'close', listener: () => void): void;
 };
 
 @Controller('edge')
@@ -50,7 +50,6 @@ export class EdgeController {
     @Query('displayId') displayId: string,
     @Query('expires') expires: string,
     @Query('signature') signature: string,
-    @Req() request: EventRequest,
     @Res() response: EventResponse,
   ): Promise<void> {
     if (!displayId || !verifyDisplayCameraPreviewSignature(cameraId, displayId, expires, signature) || !await this.displays.exists(displayId)) {
@@ -67,9 +66,16 @@ export class EdgeController {
     if (current) sendFrame(current);
     const unsubscribe = this.registry.onCameraFrame(cameraId, sendFrame);
     const keepAlive = setInterval(() => { if (!closed) response.write(': keepalive\n\n'); }, 20_000);
-    const expiryTimer = setTimeout(() => { closed = true; clearInterval(keepAlive); unsubscribe(); response.end(); }, Math.max(0, Number(expires) * 1000 - Date.now()));
+    const expiryTimer = setTimeout(() => { cleanup(); response.end(); }, Math.max(0, Number(expires) * 1000 - Date.now()));
     expiryTimer.unref?.();
-    request.on('close', () => { closed = true; clearInterval(keepAlive); clearTimeout(expiryTimer); unsubscribe(); response.end(); });
+    const cleanup = () => {
+      if (closed) return;
+      closed = true;
+      clearInterval(keepAlive);
+      clearTimeout(expiryTimer);
+      unsubscribe();
+    };
+    response.on('close', cleanup);
   }
 
   @Get('camera-frames/:cameraId/stream')
@@ -78,7 +84,6 @@ export class EdgeController {
     @Query('displayId') displayId: string,
     @Query('expires') expires: string,
     @Query('signature') signature: string,
-    @Req() request: EventRequest,
     @Res() response: EventResponse,
   ): Promise<void> {
     if (!displayId || !verifyDisplayCameraPreviewSignature(cameraId, displayId, expires, signature) || !await this.displays.exists(displayId)) {
@@ -100,9 +105,15 @@ export class EdgeController {
     const current = this.registry.latestCameraFrame(cameraId);
     if (current) sendFrame(current);
     const unsubscribe = this.registry.onCameraFrame(cameraId, sendFrame);
-    const expiryTimer = setTimeout(() => { closed = true; unsubscribe(); response.end(); }, Math.max(0, Number(expires) * 1000 - Date.now()));
+    const expiryTimer = setTimeout(() => { cleanup(); response.end(); }, Math.max(0, Number(expires) * 1000 - Date.now()));
     expiryTimer.unref?.();
-    request.on('close', () => { closed = true; clearTimeout(expiryTimer); unsubscribe(); response.end(); });
+    const cleanup = () => {
+      if (closed) return;
+      closed = true;
+      clearTimeout(expiryTimer);
+      unsubscribe();
+    };
+    response.on('close', cleanup);
   }
 
   @Get('display-metrics')
@@ -110,7 +121,6 @@ export class EdgeController {
 
   @Get('display-metrics/events')
   async displayMetricsEvents(
-    @Req() request: EventRequest,
     @Res() response: EventResponse,
   ): Promise<void> {
     response.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
@@ -131,12 +141,12 @@ export class EdgeController {
     };
     await sendUpdate();
     const unsubscribe = this.registry.onMetricsChanged(() => { void sendUpdate(); });
-    const keepAlive = setInterval(() => response.write(': keepalive\n\n'), 20_000);
-    request.on('close', () => {
+    const keepAlive = setInterval(() => { if (!closed) response.write(': keepalive\n\n'); }, 20_000);
+    response.on('close', () => {
+      if (closed) return;
       closed = true;
       clearInterval(keepAlive);
       unsubscribe();
-      response.end();
     });
   }
 }
